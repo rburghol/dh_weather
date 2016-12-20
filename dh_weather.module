@@ -1,0 +1,225 @@
+<?php
+
+//Implement hook_entity_info().
+
+function dh_weather_entity_info() {
+
+  $return['dh_timeseries_weather'] = array(
+    'label' => t('dH TimeSeries Weather'),
+    'entity class' => 'dHTimeSeriesWeatherTable',
+    'controller class' => 'dHTimeSeriesWeatherTableController',
+    'base table' => 'dh_timeseries_weather',
+    'fieldable' => TRUE,
+   //'bundle of' => '',
+    //'exportable' => TRUE,
+    'entity keys' => array (
+       'name' => 'tid',
+        'id' => 'tid',
+        'label' => 'tid',
+    ),
+    'bundles' => array(),
+    'bundle keys' => array( 
+    ),
+    'property info' => array('tstime'),
+    'access callback' => 'dh_feature_access',
+    'module' => 'dh',
+    // Enable the entity API's admin UI.
+    'admin ui' => array(
+      'path' => 'admin/content/dh_timeseries_weather',
+      'file' => 'dh.weather.admin.inc',
+      'controller class' => 'dHTimeSeriesWeatherTableUIController',
+    ),
+  );
+  
+  return $return;
+}
+
+// Implements hook_view_data_alter().
+
+function dh_weather_views_data_alter(&$data) {
+
+  // do date setups
+  $defaults_date = array(
+    'field' => array(
+      'handler' => 'views_handler_field_date',
+      'click sortable' => TRUE,
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort_date',
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_date',
+    ),
+  );
+   $defaults_numeric = array(
+      'title' => t('Numeric Field'),
+      'help' => t('Numeric Field.'), // The help that appears on the UI,
+      'argument' => array(
+         'handler' => 'views_handler_argument_numeric',
+      ),
+      'field' => array(
+         'handler' => 'views_handler_field_numeric',
+         'click sortable' => TRUE,
+			'float' => TRUE, // enables advanced formatting options
+      ),
+      'filter' => array(
+         'handler' => 'views_handler_filter_numeric',
+      ),
+      'sort' => array(
+         'handler' => 'views_handler_sort',
+      )
+   );
+  
+  // join var def to tsdata
+   $data['dh_timeseries_weather']['table']['join']['dh_variabledefinition'] = array(
+     'left_table' => 'dh_variabledefinition',
+     'left_field' => 'hydroid',
+     'field' => 'varid'
+   );
+  
+  // TimeSeries data connections
+  // join tsdata to var def 
+   $data['dh_variabledefinition']['table']['join']['dh_timeseries_weather'] = array(
+     'left_table' => 'dh_timeseries_weather',
+     'left_field' => 'varid',
+     'field' => 'hydroid'
+   );
+  // join tsdata to dH_feature
+   $data['dh_feature']['table']['join']['dh_timeseries_weather'] = array(
+     'left_table' => 'dh_timeseries_weather',
+     'left_field' => 'featureid',
+     'field' => 'hydroid'
+   );
+  // tells variabledefinition that it has a linkage path to dh_feature THRU dh_timeseries 
+   $data['dh_variabledefinition']['table']['join']['dh_feature'] = array(
+     'left_table' => 'dh_timeseries_weather',
+     'left_field' => 'varid',
+     'field' => 'hydroid'
+   );
+  // join dH_feature to TimeSeries
+   $data['dh_timeseries_weather']['table']['join']['dh_feature'] = array(
+     'left_table' => 'dh_feature',
+     'left_field' => 'hydroid',
+     'field' => 'featureid'
+   );
+   
+   $numcols = array('rh', 'temp', 'tmin', 'tmax', 'wet_time', 'rain', 'wind_spd', 'wind_dir', 'solar_rad');
+   $strcols = array();
+   $datecols = array('tstime', 'tsendtime');
+   foreach ($strcols as $thiscol) {
+      $data['dh_timeseries_weather'][$thiscol] = $defaults_string;
+      $data['dh_timeseries_weather'][$thiscol]['title'] = t("Vitis Data $thiscol");
+      $data['dh_timeseries_weather'][$thiscol]['help'] = t("Vitis $thiscol");
+   }
+   foreach ($numcols as $thiscol) {
+      $data['dh_timeseries_weather'][$thiscol] = $defaults_numeric;
+      $data['dh_timeseries_weather'][$thiscol]['title'] = t("Vitis $thiscol");
+      $data['dh_timeseries_weather'][$thiscol]['help'] = t("Vitis $thiscol");
+   }
+   foreach ($datecols as $thiscol) {
+      $data['dh_timeseries_weather'][$thiscol]['field'] = $defaults_date['field'];
+      $data['dh_timeseries_weather'][$thiscol]['sort'] = $defaults_date['sort'];
+      $data['dh_timeseries_weather'][$thiscol]['filter'] = $defaults_date['filter'];
+   }
+   
+   //foreach ($datecols as $thiscol) {
+   //   $data['dh_timeseries_weather'][$thiscol]['filter'] = array('handler' => 'views_handler_filter_date');
+   //}
+   
+  
+}
+
+class dHTimeSeriesWeatherTable extends Entity {
+
+  public $is_new;
+  public $tid;
+  public $tstime;
+  public $utcoffset;
+  public $temp;
+  public $tmin;
+  public $tmax;
+  public $wet_time;
+  public $rh;
+  public $rain;
+  public $wind_spd;
+  public $wind_dir;
+  public $tsendtime;
+  public $pres;
+  public $dew_pt;
+  public $solar_rad;
+  public $featureid;
+  public $varid;
+
+  public function __construct($values = array()) {
+    if (isset($values['year']) or isset($values['month']) or isset($values['day'])) {
+      if (isset($values['month'])) {
+        $yr = $values['year'];
+      } else {
+        $yr = date('Y');
+      }
+      if (isset($values['month'])) {
+        $mo = $values['month'];
+      } else {
+        $mo = '01';
+      }
+      if (isset($values['day'])) {
+        $da = $values['day'];
+      } else {
+        $da = '01';
+      }
+      $newts = strtotime("$yr-$mo-$da");
+      if (!($newts === false)) {
+        $values['tstime'] = $newts;
+      }
+    }
+    foreach (array('tstime', 'tsendtime') as $tvar) {
+      if (isset($values[$tvar])) {
+        // if a valid unix epoch style timestamp has been submitted 
+        // this next comparator will return TRUE
+        if (!( !is_int($values[$tvar]) ? (ctype_digit($values[$tvar])) : true ) ) {
+          // not a valid unix timestamp, so try to convert from some date format
+          $values[$tvar] = strtotime($values[$tvar]);
+        } else {
+          // valid unix timestamp submitted, proceed without changing
+        }
+      }
+    }
+    parent::__construct($values, 'dh_timeseries_weather');
+  }
+  protected function defaultLabel() {
+    return $this->varid;
+  }
+}
+
+
+class dHTimeSeriesWeatherTableController extends EntityAPIControllerExportable {
+
+  public function __construct($entityType) {
+    parent::__construct($entityType);
+  }
+
+  public function create(array $values = array()) {
+    // Add values that are specific to our Model
+    $values += array( 
+      'tid' => '',
+      'tstime' => '',
+      'utcoffset' => '',
+      'temp' => '',
+      'tmin' => '',
+      'tmax' => '',
+      'wet_time' => '',
+      'rh' => '',
+      'rain' => '',
+      'wind_spd' => '',
+      'wind_dir' => '',
+      'solar_rad' => '',
+      'tsendtime' => '',
+      'pres' => '',
+      'dew_pt' => '',
+      'featureid' => '',
+      'varid' => ''
+    );
+    $feature_type = parent::create($values);
+    return $feature_type;
+  }
+}

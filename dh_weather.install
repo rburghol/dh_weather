@@ -1,0 +1,270 @@
+<?php
+
+function dh_weather_schema() {
+   // 
+     $schema['dh_timeseries_weather'] = array (
+     'description' => 'Time Series Data in dh (ArcHydro: timeseries)',
+     'fields' => array(
+     'tid' => array(
+       'description' => 'Primary key for Variables',
+       'type' => 'serial',
+       'unsigned' => TRUE,
+       'not null' => TRUE,
+     ),
+     'tstime' =>  array(
+       'description' =>  'Timestamp for monitored value.',
+       'type' => 'int',
+       'not null' => TRUE,
+       'default' => 1,
+       'size' => 'big',
+     ),
+     'tsendtime' =>  array(
+       'description' =>  'Timestamp for monitored value period end (if applicable).',
+       'type' => 'int',
+       'not null' => FALSE,
+       'default' => 1,
+       'size' => 'big',
+     ),
+     'utcoffset' =>  array(
+       'description' => 'UTC Offset for timestamp.',
+       'type' => 'float',
+       'not null' => FALSE,
+       'default' => 0,
+     ),
+     'featureid' =>  array(
+       'description' => 'Unique numerical identifier of a feature within the geodatabase. Usually, the FeatureID of a TimeSeries record is equal to the HydroID of a feature (e.g., well, monitoring point).',
+       'type' => 'int',
+       'not null' => TRUE,
+       'default' => 1,
+       'size' => 'big',
+       'not null' => TRUE,
+     ), 
+     'varid' =>  array(
+       'description' => 'Unique numerical identifier of a variable within the geodatabase. Variables are defined in the VariableDefinition table.',
+       'type' => 'int',
+       'not null' => TRUE,
+       'default' => 0,
+       'size' => 'big',
+       'not null' => TRUE,
+     ), 
+      'temp' => array(
+        'description' => 'Temp= (C)',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'tmin' => array(
+        'description' => 'Temp Min (C)',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'tmax' => array(
+        'description' => 'Temp Max (C)',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'wet_time' => array(
+        'description' => 'Wetness (min)',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'rh' => array(
+        'description' => 'RH (%)',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'rain' => array(
+        'description' => 'Depth of Rain during interval(mm)',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'wind_spd' => array(
+        'description' => 'Wind Speed',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'wind_dir' => array(
+        'description' => 'Wind Direction',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'solar_rad' => array(
+        'description' => 'Solar Radiation',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+      'pres' => array(
+        'description' => 'Pressure (Pa)',
+        'type' => 'float',
+        'not null' => FALSE,
+      ),
+     ) + entity_exportable_schema_fields(),
+     'primary key' => array('tid'),
+     'indexes' => array(
+       'dh_tsw_tix' => array('tid'),
+       'dh_tsw_fix' => array('featureid'),
+       'dh_tsw_vix' => array('varid'),
+       'dh_tsw_tsix' => array('tstime'),
+       'dh_tsw_tseix' => array('tsendtime'),
+    )
+  );
+  //om_create_default_views();
+  
+  return $schema;
+}
+
+function dh_weather_uninstall() {
+  $fields = array('dh_link_station_sensor', 'dh_sensor_mfr', 'dh_sensor_model');
+	$bundle = 'dh_weather_sensor';
+  foreach ($fields as $field) {
+    $instance_info = field_info_instance('dh_feature', $field, $bundle);
+    field_delete_instance($instance_info, TRUE);
+    while (!(field_info_field($field) === NULL)) {
+      field_delete_field($field);
+      $numd++;
+      if ($numd < 10) {
+        drupal_set_message("Loop detected - exiting");
+        break;
+      }
+	  }
+    //field_delete_field($field);
+  }
+}
+
+
+function dh_weather_references() {
+  $refdefs = array();
+  // add references
+  $refdefs[] = array(
+    'fieldname' => 'dh_link_station_sensor',
+    'src_type' => 'dh_feature',
+    'src_bundle' => 'weather_sensor',
+    'dest_type' => 'dh_feature',
+		'dest_bundle' => array('weather_station'),
+    'label' => 'Weather Station',
+		'select_type' => 'entityreference_autocomplete'
+  );
+  $refdefs[] = array(
+    'fieldname' => 'dh_link_station_landunit',
+    'src_type' => 'dh_feature',
+    'src_bundle' => 'weather_station',
+    'dest_type' => 'dh_feature',
+		'dest_bundle' => array('landunit'),
+    'label' => 'Land Unit',
+		'select_type' => 'entityreference_autocomplete'
+  );
+  //  Feature Managing User
+  $managed = array('weather_station', 'weather_sensor');
+  foreach ($managed as $bundle) {
+    $refdefs[] = array(
+      'fieldname' => 'dh_link_feature_mgr_id',
+      'src_type' => 'dh_feature',
+      'src_bundle' => $bundle,
+      'dest_type' => 'user',
+      'dest_bundle' => NULL,
+      'label' => 'Link from Admin record to Managing User',
+      'select_type' => 'entityreference_autocomplete'
+    );
+  }
+  return $refdefs;
+}
+
+function dh_weather_install() {
+  // add bundles
+  dh_add_weather_bundles();
+  dh_weather_add_views();
+  
+  // add references
+  $refdefs = dh_weather_references();
+  dh_add_references($refdefs);
+  
+  // set up fields here
+  $fields_fields = array(
+    'weather_station' => array(
+      'dh_geofield' => array('label' => 'Geometry', 'type' => 'geofield', 'display' => 'geofield_wkt', 'widget' => 'geofield_wkt'),
+    ),
+    'weather_sensor' => array(
+      'dh_geofield' => array('label' => 'Geometry', 'type' => 'geofield', 'display' => 'geofield_wkt', 'widget' => 'geofield_wkt'),
+      'dh_sensor_mfr' => array('label' => 'Sensor Manufacturer', 'type' => 'text', 'settings'   => array('size' => 60)),
+      'dh_sensor_model' => array('label' => 'Sensor Model', 'type' => 'text', 'settings'   => array('size' => 60)),
+    ),
+  );
+	foreach ($fields_fields as $key => $thistype) {
+		dh_initialize_fields($key, '', 'dh_feature', $fields_fields);
+	}
+}
+
+function dh_add_weather_bundles() {
+   $typedefs = array(
+      'weather_station' => array('bundle' => 'weather_station', 'name' => 'Weather Station', 'description' => 'dH Basic Weather Station Feature'),
+      'weather_sensor' => array('bundle' => 'weather_sensor', 'name' => 'Weather Sensor', 'description' => 'dH Sensor Attached to Station'),
+	);
+
+	foreach ($typedefs as $key => $thistype) {
+		dh_base_feature_type_save($thistype);
+	  //dh_initialize_fields($key);
+	}
+}
+
+function dh_weather_define_views() {
+  $views = array();
+  /*
+  $views['dh_views_last_weather24'] = "  create or replace view {dh_views_last_weather24} as ";
+  $views['dh_views_last_weather24'] .= " select a.featureid, ";
+  $views['dh_views_last_weather24'] .= "   a.tstime as tsendtime, min(b.tstime) as tstime, ";
+  $views['dh_views_last_weather24'] .= "   sum(b.rain) as rain, sum(b.wet_min) as wet_min, ";
+  $views['dh_views_last_weather24'] .= "   avg(b.temp) as temp, avg(b.rh) as rh ";
+  $views['dh_views_last_weather24'] .= " from ( ";
+  $views['dh_views_last_weather24'] .= "   select a.featureid, max(a.tstime) as tstime ";
+  $views['dh_views_last_weather24'] .= "   from {dh_timeseries_weather} as a ";
+  $views['dh_views_last_weather24'] .= "   left outer join {dh_variabledefinition} as b ";
+  $views['dh_views_last_weather24'] .= "   on ( a.varid = b.varid and b.varkey = 'weather_obs' ) ";
+  $views['dh_views_last_weather24'] .= "   where b.varid is not null ";
+  $views['dh_views_last_weather24'] .= " ) as a ";
+  */
+  return $views;
+}
+
+function dh_weather_add_views($views = array()) {
+  $allviews = dh_weather_define_views();
+  if (count($views) == 0) {
+    $views = array_keys($allviews);
+  }
+  foreach ($views as $viewname => $viewsql) {
+    db_query( $viewsql );
+  }
+}
+  
+function dh_weather_update_7101() {
+	db_query("alter table {dh_timeseries_weather} add column tsendtime bigint default 0 ");
+	drupal_set_message(t("Added and initialized default on dh_timeseries_weather tsendtime column."));
+	db_query("alter table {dh_timeseries_weather} add column pres float8 ");
+	db_query("alter table {dh_timeseries_weather} add column dew_pt float8 ");
+	drupal_set_message(t("Added Pressure (pres) and Dew Point on dh_timeseries_weather."));
+}
+
+function dh_weather_update_7112() {
+  $alldefs = dh_weather_references();
+  foreach ($alldefs as $thisdef) {
+    if ($thisdef['fieldname'] == 'dh_link_station_landunit') {
+      dh_add_references(array($thisdef));
+    }
+  }
+}
+function dh_weather_update_7113() {
+  $refdefs = array();
+  //  Feature Managing User
+  $managed = array('weather_station', 'weather_sensor');
+  foreach ($managed as $bundle) {
+    $refdefs[] = array(
+      'fieldname' => 'dh_link_feature_mgr_id',
+      'src_type' => 'dh_feature',
+      'src_bundle' => $bundle,
+      'dest_type' => 'user',
+      'dest_bundle' => NULL,
+      'label' => 'Link from feature record to Managing User',
+      'select_type' => 'entityreference_autocomplete'
+    );
+  }
+  dh_add_references($refdefs, false);
+}
+?>
