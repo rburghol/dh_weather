@@ -31,6 +31,13 @@ function dh_weather_schema() {
        'not null' => FALSE,
        'default' => 0,
      ),
+      'entity_type' => array(
+        'description' => 'Entity Type (default: dh_feature)',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => FALSE,
+        'default' => 'dh_feature',
+      ),
      'featureid' =>  array(
        'description' => 'Unique numerical identifier of a feature within the geodatabase. Usually, the FeatureID of a TimeSeries record is equal to the HydroID of a feature (e.g., well, monitoring point).',
        'type' => 'int',
@@ -266,5 +273,21 @@ function dh_weather_update_7113() {
     );
   }
   dh_add_references($refdefs, false);
+}
+
+function dh_weather_update_7114() {
+  $schema = dh_weather_schema();
+  foreach (array('dh_timeseries_weather') as $tablename) {
+    foreach (array('entity_type') as $colname) {
+      if (!db_field_exists($tablename, $colname)) {
+        drupal_set_message(t("Adding $colname to $tablename"));
+        db_add_field(
+          $tablename, 
+          $colname, 
+          $schema[$tablename]['fields'][$colname]
+        );
+      }
+    }
+  }
 }
 ?>

@@ -149,6 +149,7 @@ class dHTimeSeriesWeatherTable extends Entity {
   public $solar_rad;
   public $featureid;
   public $varid;
+	public $entity_type;
 
   public function __construct($values = array()) {
     if (isset($values['year']) or isset($values['month']) or isset($values['day'])) {
@@ -217,6 +218,7 @@ class dHTimeSeriesWeatherTableController extends EntityAPIControllerExportable {
       'pres' => '',
       'dew_pt' => '',
       'featureid' => '',
+      'entity_type' => '',
       'varid' => ''
     );
     $feature_type = parent::create($values);
