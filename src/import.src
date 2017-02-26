@@ -1,0 +1,19 @@
+#!/user/bin/env drush
+<?php
+// Load the Feeds Source object.
+$importer_id = 'dh_weather_import_any';
+$csv_file = '/var/www/incoming/weather/formatted/csci_weather.csv';
+$source = feeds_source($importer_id);
+// Load the source fetcher config.
+$fetcher_config = $source->getConfigFor($source->importer->fetcher);
+$fetcher_config['source'] = $csvfile_path;
+$source->setConfigFor($source->importer->fetcher, $fetcher_config);
+$source->save();
+// Tweak the importer configuration, to enable "Process in the background".
+$config = array(
+  'process_in_background' => TRUE,
+);
+$source->importer->addConfig($config);
+$source->startImport();
+
+?>

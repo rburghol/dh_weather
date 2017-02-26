@@ -20,7 +20,7 @@ function dh_weather_entity_info() {
     'bundles' => array(),
     'bundle keys' => array( 
     ),
-    'property info' => array('tstime'),
+    'property info' => array('entity_type', 'featureid', 'tstime', 'tsendtime', 'varid', 'temp', 'wet_time', 'rain', 'rh', 'solar_rad', 'wind_dir', 'wind_spd', 'pres', 'dew_pt', 'tmin', 'tmax'),
     'access callback' => 'dh_feature_access',
     'module' => 'dh',
     // Enable the entity API's admin UI.
@@ -33,6 +33,24 @@ function dh_weather_entity_info() {
   
   return $return;
 }
+
+
+// Implements hook_entity_property_info_alter().
+function dh_weather_entity_property_info_alter(&$entity_info) {
+
+  $feature_fields = &$entity_info['dh_timeseries_weather']['properties'];
+  $settable_feat = array('entity_type', 'featureid', 'tstime', 'tsendtime', 'varid', 'temp', 'wet_time', 'rain', 'rh', 'solar_rad', 'wind_dir', 'wind_spd', 'pres', 'dew_pt', 'tmin', 'tmax');
+  foreach ($settable_feat as $thiscol) {
+    $feature_fields[$thiscol]['setter callback'] = 'entity_property_verbatim_set';
+    $feature_fields[$thiscol]['getter callback'] = 'entity_property_verbatim_get';
+    $feature_fields[$thiscol]['setter permission'] = 'edit own dh_timeseries entities';
+    //$feature_fields[$thiscol]['type'] = 'user';
+    $feature_fields[$thiscol]['schema field'] = $thiscol;
+    $feature_fields[$thiscol]['label'] = t($thiscol);
+    $feature_fields[$thiscol]['description'] = t($thiscol);
+  }
+}
+ 
 
 // Implements hook_view_data_alter().
 
@@ -125,7 +143,37 @@ function dh_weather_views_data_alter(&$data) {
    //foreach ($datecols as $thiscol) {
    //   $data['dh_timeseries_weather'][$thiscol]['filter'] = array('handler' => 'views_handler_filter_date');
    //}
-   
+  
+  // for explicit joins
+  $e = entity_get_info();
+  foreach ($e as $ename => $einfo) {
+    $ebase = $einfo['base table'];
+    $elabel = $einfo['label'];
+    $eidcol = $einfo['entity keys']['id'];
+    if ($eidcol) {
+      // should go through and add a relationship for all entity types
+      $data[$ebase]['cts_weath_' . $ebase] = array(
+        'real field' => 'adminid',
+        'relationship' => array(
+          'title' => 'dH Weather Timeseries Link to ' . $ebase,
+          'help' => 'dH Weather Timeseries Link to ' . $ebase,
+          'handler' => 'views_handler_relationship',
+          'label' => t('dH Weather Table Explicit Join to ' . $elabel),
+          'base' => 'dh_timeseries_weather',
+          'base field' => 'featureid',
+          'left_table' => $ebase,
+          'field' => $eidcol,
+        )
+      );
+      if (!isset($data[$ebase]['cts_weath_' . $ebase]['relationship']['extra'])) { 
+        $data[$ebase]['cts_weath_' . $ebase]['relationship']['extra'] = array();
+      }
+      $data[$ebase]['cts_weath_' . $ebase]['relationship']['extra'][] = array(
+        'field' => 'entity_type', 
+        'value' => $ename
+      );
+    }
+  }
   
 }
 
@@ -223,5 +271,110 @@ class dHTimeSeriesWeatherTableController extends EntityAPIControllerExportable {
     );
     $feature_type = parent::create($values);
     return $feature_type;
+  }
+}
+
+// Helper functions
+
+function dh_get_timeseries_weather(&$values, $multiplicity) {
+  // ***********************************************************
+  // * Do translations
+  //   * make sure the variable is in place and translated to varid
+  //   * Translate tstime and tsendtime to seconds since the epoch
+  // ***********************************************************
+  if (isset($values['tstime'])) {
+    $values['tstime'] = dh_handletimestamp($values['tstime']);
+  } else {
+    return FALSE;
+  }
+  if (isset($values['tsendtime'])) {
+    $values['tsendtime'] = dh_handletimestamp($values['tsendtime']);
+  }
+  // make sure the variable is in place and translated to varid
+  if (isset($values['varid'])) {
+    $var = dh_vardef_info($values['varid']);
+    if (is_object($var)) {
+      $values['varid'] = $var->hydroid;
+    }
+  }
+  $efq = new EntityFieldQuery;
+  $efq->entityCondition('entity_type', 'dh_timeseries_weather');
+  $efq->propertyCondition('featureid', $values['featureid'], '=');
+  if (!$multiplicity == 'all') {
+    // if 'all' is requete we ignoire varid, otherwise we want a specific var
+    $efq->propertyCondition('varid', $values['varid'], '=');
+  }
+  $efq->propertyCondition('entity_type', $values['entity_type'], '=');
+  $efq->propertyCondition('featureid', $values['featureid'], '=');
+  // singular - one record only for featureid/entity_type/varid - clear all if multiple
+  //   ex: a birthdate
+  // non_singular - just force an insert regardless of duplication
+  // tstime_singular - one record for featureid/entity_type/varid/tstime/tsendtime
+  switch ($multiplicity) {
+    case 'all':
+    // returning all
+    break;
+    
+    case 'singular':
+    // expects only 1 value, but essentially returns all values
+    break;
+    
+    case 'non_singular':
+    // returns any values for this featureid/entity_type
+    break;
+    
+    case 'tstime_singular':
+      $efq->propertyCondition('tstime', $values['tstime'], '=');
+    break;
+    
+    case 'tspan_singular':
+      $efq->propertyCondition('tstime', $values['tstime'], '=');
+      $efq->propertyCondition('tstime', $values['tsendtime'], '=');
+    break;
+    
+    default:
+      $efq->propertyCondition('tstime', $values['tstime'], '=');
+    break;
+  }
+  $result = $efq->execute();
+  return $result;
+}
+
+
+function dh_update_timeseries_weather($values, $multiplicity = 'tstime_singular') {  
+  // must have timestamp, featureid and entity_type
+  $notnull = array('featureid', 'entity_type', 'tstime', 'varid');
+  foreach ($notnull as $v) {
+    if (!isset($values[$v]) or ($values[$v] === NULL)) {
+      watchdog('dh_timeseries_weather', "NULL value for dh_timeseries_weather $v");
+      return FALSE;
+    }
+  }
+  $result = dh_get_timeseries_weather($values, $multiplicity);
+  if (isset($result['dh_timeseries_weather'])) {
+    //dpm($result,"found records - checking singularity settings");
+    $data = entity_load('dh_timeseries_weather', array_keys($result['dh_timeseries_weather']));
+    $record = array_shift($data);
+    if (!(strpos($multiplicity, 'singular') === FALSE)) {
+      // we need to grab one and delete the others because this is to be singular
+      // otherwise, we just take the first one we come to and ignore the rest
+      foreach ($data as $todel) {
+        entity_delete('dh_timeseries_weather', $todel->tid);
+      }
+    }
+    foreach ($values as $key => $val) {
+      $record->$key = $val;
+    }
+  } else {
+    //dpm($values,"creating ts");
+    $record = entity_create('dh_timeseries_weather', $values);
+  }
+  if (is_object($record) and method_exists($record, 'save')) {
+    //dpm($record, "updating");
+    $record->save();
+    return TRUE;
+  } else {
+    //dpm($record,"record is not object or save() method does not exist");
+    return FALSE;
   }
 }
