@@ -174,6 +174,19 @@ function dh_weather_views_data_alter(&$data) {
       );
     }
   }
+  // special filter that uses a select widget
+  // and preserves reverse compatibility
+  $data['dh_timeseries_weather']['varidid'] = array();
+  $data['dh_timeseries_weather']['varidid']['real field'] = 'varid';
+  //$data['dh_timeseries_weather']['varidid']['group'] = $data['dh_timeseries_weather']['varid']['group'];
+  $data['dh_timeseries_weather']['varidid']['title'] = $data['dh_timeseries_weather']['varid']['title'] . " (selector)";
+  $data['dh_timeseries_weather']['varidid']['help'] = $data['dh_timeseries_weather']['varid']['title'] . " (selector)";
+  $data['dh_timeseries_weather']['varidid']['filter'] = array(
+    'label' => "TS Variable Name/Key (selector)",
+    //'handler' => 'dh_views_handler_filter_in_operator_on',
+    'handler' => 'views_handler_filter_dh_propvarkey',
+    'options callback' => 'dh_vardef_varselect_options',
+  );
   
 }
 
@@ -284,8 +297,6 @@ function dh_get_timeseries_weather(&$values, $multiplicity) {
   // ***********************************************************
   if (isset($values['tstime'])) {
     $values['tstime'] = dh_handletimestamp($values['tstime']);
-  } else {
-    return FALSE;
   }
   if (isset($values['tsendtime'])) {
     $values['tsendtime'] = dh_handletimestamp($values['tsendtime']);
@@ -376,5 +387,39 @@ function dh_update_timeseries_weather($values, $multiplicity = 'tstime_singular'
   } else {
     //dpm($record,"record is not object or save() method does not exist");
     return FALSE;
+  }
+}
+
+class DHDefaultWeatherSource {
+  function importWeatherFeatures($config = array()) {
+    // defines method to connect to a remote service to get features 
+    // that will later have weather data attached to them
+  }
+  function importWeatherTSData($date, $filters) {
+    // defines method to connect to a remote service to 
+    // atach weather data to features that have already been retreived
+    // may be used to call importWeatherFeatures
+  }
+}
+
+
+function dh_weather_ctools_plugin_type() {
+  // this is a test, as it may move to the base dh module.
+  return array(
+    'dh_weather_data_sources' => array(
+      'classes' => array('handler'),
+    ),
+  );
+}
+
+function dh_weather_ctools_plugin_directory($owner, $plugin_type) {
+  if ($owner == 'ctools' && $plugin_type == 'dh_weather_data_sources') {
+    return 'plugins/' . $plugin_type;
+  }
+  if ($owner == 'om' && $plugin_type == 'om_components') {
+    return 'plugins/' . $plugin_type;
+  }
+  if ($owner == 'dh' && $plugin_type == 'dh_variables') {
+    return 'plugins/' . $plugin_type;
   }
 }
