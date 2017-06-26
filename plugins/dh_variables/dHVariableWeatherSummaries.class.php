@@ -20,7 +20,7 @@ class dHVPWeatherSummary extends dHVariablePluginDefault {
     $q .= "   and tstime < $end ";
     $q .= "   and varid = $varid ";
     $q .= " group by featureid, entity_type ";
-    dpm($q,'query');
+    //dpm($q,'query');
     $result = db_query($q);
     $record = $result->fetchAssoc();
     return $record;
@@ -76,11 +76,11 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
   
   public function formRowEdit(&$rowform, $entity) {
     // apply custom settings here
-    dpm($entity,'entity');
+    //dpm($entity,'entity');
     $summary = $this->summarizeDarknessTimePeriod($entity);
-    dpm($summary,'summary');
-    dpm($rowform,'form');
-    dpm(date_default_timezone_get(),'date_default_timezone_get()');
+    //dpm($summary,'summary');
+    //dpm($rowform,'form');
+    //dpm(date_default_timezone_get(),'date_default_timezone_get()');
     // @todo: include a select list in edit form to allow user to force over-ride the summary
     //        otherwise, the default behavior on save will be to derive the summary from the weather_obs
     //        data in the database table.
@@ -88,7 +88,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
   }
   
   public function formRowSave(&$rowvalues, &$row) {
-    dpm($rowvalues,'values');
+    //dpm($rowvalues,'values');
     parent::formRowSave($rowvalues, $row);
   }
   
@@ -97,13 +97,13 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     $starthour = 21; // 9 pm, could later calculate this algorithmically based on julian day
     $endhour = 5; // a summertime default
     list($yesteryear, $yestermonth, $yesterday) = explode ('-', date('Y-m-d', (dh_handletimestamp($entity->tstime) - 86400)));
-    dpm(array($yesteryear, $yestermonth, $yesterday),'yesterday');
+    //dpm(array($yesteryear, $yestermonth, $yesterday),'yesterday');
     $begin = implode('-', array($yesteryear, $yestermonth, $yesterday)) . " $starthour:00:00";
     $end = date('Y-m-d', dh_handletimestamp($entity->tstime)) . " $endhour:00:00";
-    dpm('range'," $begin, $end");
+    //dpm('range'," $begin, $end");
     $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->realtime_varkey, $begin, $end);
     $varids = dh_varkey2varid($this->darkness_varkey);
-    dpm($varids, $this->darkness_varkey);
+    //dpm($varids, $this->darkness_varkey);
     $summary['varid'] = array_shift( $varids);
     return $summary;
   }
@@ -111,7 +111,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
   public function save(&$entity){
     // save a summary of nighttime periods
     $summary = $this->summarizeDarknessTimePeriod($entity);
-    dpm($summary,'summary at save()');
+    //dpm($summary,'summary at save()');
     if (is_array($summary)) {
       dh_update_timeseries_weather($summary, 'tstime_enddate_singular');
     }
