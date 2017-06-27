@@ -31,7 +31,7 @@
     // Load some entity.
     dh_update_timeseries_weather($record, 'tstime_date_singular');
     //echo "Object" . print_r($form,1) . "\n";
-    echo "saved $record[featureid] " . date('Y-m-d', $record['tstime'] . " \n";
+    echo "saved $record[featureid] " . date('Y-m-d', $record['tstime']) . " \n";
   }
 
 ?>
