@@ -64,6 +64,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
   //  default: agchem_apply_fert_ee
   //       fr: agchem_apply_fert_fr 
   var $realtime_varkey = 'weather_obs';
+  var $daily_varkey = 'weather_obs_daily_sum';
   var $darkness_varkey = 'weather_daily_dark_sum';
   
   public function __construct($conf = array()) {
@@ -107,8 +108,37 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     $summary['varid'] = array_shift( $varids);
     return $summary;
   }
+  
+  public function summarizeDaily($entity) {
+    // $entity is the dh_timeseries_weather entity in question
+    $date = date('Y-m-d', dh_handletimestamp($entity->tstime));
+    $begin = $date . " 00:00:00";
+    $end = $date . " 23:59:59";
+    //dpm('range'," $begin, $end");
+    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->realtime_varkey, $begin, $end);
+    $varids = dh_varkey2varid($this->daily_varkey);
+    //dpm($varids, $this->darkness_varkey);
+    $summary['varid'] = array_shift( $varids);
+    return $summary;
+  }
 
   public function save(&$entity){
+    // save a summary of the whole day
+    // we need to do a check here in the event that 
+    // we are forcing an override of the daily summary
+    // perhaps we could set a switch on the form handler to add a property to the object?
+    $summary = $this->summarizeDaily($entity);
+    //dpm($summary,'summary at save()');
+    // apply summary values to entity properties and they will get saved by the controller
+    if (is_array($summary)) {
+      // we need to
+      $vars = array('temp', 'wet_time', 'rh', 'rain', 'wind_spd', 'wind_dir', 'solar_rad', 'pres', 'dew_pt', 'tmin', 'tmax');
+      foreach ($summary as $key => $val) {
+        if (in_array($key, $vars)) {
+          $entity->$key = $val;
+        }
+      }
+    }
     // save a summary of nighttime periods
     $summary = $this->summarizeDarknessTimePeriod($entity);
     //dpm($summary,'summary at save()');

@@ -463,7 +463,8 @@ function dh_update_timeseries_weather($values, $multiplicity = 'tstime_singular'
       $record->$key = $val;
     }
   } else {
-    dpm($values,"creating ts");
+    //dpm($values,"creating ts");
+    error_log("creating ts" . print_r($values,1));
     $record = entity_create('dh_timeseries_weather', $values);
   }
   if (is_object($record) and method_exists($record, 'save')) {
