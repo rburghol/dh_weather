@@ -12,7 +12,9 @@ class dHVPWeatherSummary extends dHVariablePluginDefault {
     $q .= "   $begin as tstime, $end as tsendtime, avg(temp) as temp, ";
     $q .= "   sum(wet_time) as wet_time, avg(rh) as rh, sum(rain) as rain, ";
     //$q .= "   avg(wind_spd), avg(wind_dir), CASE sum(solar_rad), avg(pres), avg(dew_pt),  ";
-    $q .= "   min(tmin) as tmin, max(tmax) as tmax ";
+    // we do this on the temp column instead of tmax and tmin because these are not always available on realtime recs
+    //$q .= "   min(tmin) as tmin, max(tmax) as tmax ";
+    $q .= "   min(temp) as tmin, max(temp) as tmax ";
     $q .= " from {dh_timeseries_weather}  ";
     $q .= " where featureid = $featureid ";
     $q .= "   and entity_type = '$entity_type' ";
@@ -117,7 +119,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     //dpm('range'," $begin, $end");
     $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->realtime_varkey, $begin, $end);
     $varids = dh_varkey2varid($this->daily_varkey);
-    //dpm($varids, $this->darkness_varkey);
+    //dpm($varids, $this->daily_varkey);
     $summary['varid'] = array_shift( $varids);
     return $summary;
   }
