@@ -134,7 +134,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     // apply summary values to entity properties and they will get saved by the controller
     if (is_array($summary)) {
       // we need to
-      $vars = array('temp', 'wet_time', 'rh', 'rain', 'wind_spd', 'wind_dir', 'solar_rad', 'pres', 'dew_pt', 'tmin', 'tmax');
+      $vars = array('tstime', 'tsendtime', 'temp', 'wet_time', 'rh', 'rain', 'wind_spd', 'wind_dir', 'solar_rad', 'pres', 'dew_pt', 'tmin', 'tmax');
       foreach ($summary as $key => $val) {
         if (in_array($key, $vars)) {
           $entity->$key = $val;

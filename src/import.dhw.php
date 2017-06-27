@@ -56,7 +56,8 @@ while ($values = fgetcsv($handle)) {
     echo "... $i ";
   }
 }
-$sumvar = array_shift($varids = dh_varkey2varid('weather_obs_daily_sum'));
+//$sumvar = array_shift($varids = dh_varkey2varid('weather_obs_daily_sum'));
+$sumvar = array_shift(dh_varkey2varid('weather_obs_daily_sum'));
 foreach ($summaries as $sensor => $dates) {
   foreach ($dates as $thisdate) {
     $values = array(
@@ -65,7 +66,7 @@ foreach ($summaries as $sensor => $dates) {
       'tstime' => $thisdate,
       'varid' => $sumvar
     );
-    echo "Updating $sensor - $thisdate \n";
+    echo "Updating $sensor - $thisdate for varid = $sumvar \n";
     dh_update_timeseries_weather($values, 'tstime_date_singular');
   }
 }
