@@ -175,6 +175,28 @@ function dh_timeseries_weather_form($form, &$form_state, $dh_timeseries_weather,
     '#size' => 64,
   );*/
 
+  $date_format = 'Y-m-d H:i:s';
+  $form['tstime'] = array(
+    '#title' => t('Event Date/Time'),
+    '#default_value' => empty($dh_timeseries_weather->tstime) ? date($date_format) : date($date_format,$dh_timeseries_weather->tstime),
+    '#description' => t('Timestamp for monitored value.'),
+    '#date_format' => $date_format,
+    '#type' => 'date_select',
+    '#date_year_range' => '-100:+50',
+    '#required' => TRUE,
+    //'#date_timezone' => 'UTC', 
+  );
+  $form['tsendtime'] = array(
+    '#title' => t('Event End Time'),
+    '#default_value' => empty($dh_timeseries_weather->tsendtime) ? $dh_timeseries_weather->tsendtime : date($date_format,$dh_timeseries_weather->tsendtime),
+    '#description' => t('Timestamp for endtime value.'),
+    '#date_format' => $date_format,
+    '#type' => 'date_select',
+    '#date_year_range' => '-100:+100',
+    '#required' => FALSE,
+    //'#date_timezone' => 'UTC', 
+  );
+  /*
   $form['tstime'] = array(
     '#title' => t('TimeSeries Time'),
     '#type' => 'textfield',
@@ -183,6 +205,16 @@ function dh_timeseries_weather_form($form, &$form_state, $dh_timeseries_weather,
     '#required' => TRUE,
     '#size' => 64,
   );
+  
+  $form['tsendtime'] = array(
+    '#title' => t('Period End'),
+    '#type' => 'textfield',
+    '#default_value' => $dh_timeseries_weather->tsendtime,
+    '#description' => t('Period End (for time spans).'),
+    '#required' => FALSE,
+    '#size' => 64,
+  );
+  */
   
   $form['utcoffset'] = array(
     '#title' => t('UTC Offset'),
@@ -274,15 +306,6 @@ function dh_timeseries_weather_form($form, &$form_state, $dh_timeseries_weather,
     '#size' => 16,
   );
   
-  $form['tsendtime'] = array(
-    '#title' => t('Period End'),
-    '#type' => 'textfield',
-    '#default_value' => $dh_timeseries_weather->tsendtime,
-    '#description' => t('Period End (for time spans).'),
-    '#required' => FALSE,
-    '#size' => 64,
-  );
-  
   $form['dew_pt'] = array(
     '#title' => t('Dew Point Temp (C)'),
     '#type' => 'textfield',
@@ -325,6 +348,9 @@ function dh_timeseries_weather_form($form, &$form_state, $dh_timeseries_weather,
     '#value' => t('Save Time Series data'),
     '#weight' => 40,
   );
+  module_load_include('inc', 'dh', 'dh.admin');
+  module_load_include('module', 'dh');
+  dh_variables_formRowPlugins($form, $dh_timeseries_weather);
   return $form;
 }
 
@@ -332,6 +358,7 @@ function dh_timeseries_weather_form($form, &$form_state, $dh_timeseries_weather,
  */
 function dh_timeseries_weather_form_submit(&$form, &$form_state) {
   $dh_timeseries_weather = entity_ui_form_submit_build_entity($form, $form_state);
+  dh_variables_formSubmitPlugins($form_state['values'], $dh_timeseries_weather);
   $dh_timeseries_weather->save();
   $form_state['redirect'] = 'admin/content/dh_timeseries_weather/';
 }

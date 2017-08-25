@@ -26,6 +26,11 @@ $varid = is_array($varid) ? array_shift($varid) : $varid;
 $keys = array('tstime', 'records', 'battV_min', 'temp', 'rh', 'LWmV_avg', 'LWMdry_tot', 'LWMcon_tot', 'wet_time', 'rain', 'time_interval', 'hydrocode');
 $i = 0;
 echo "Processed ";
+$summaries = array(); 
+// $summaries = array(
+//   2 => array(
+//     '2017-06-01' => '2017-05-01',
+// if current date does not match last date, do summary using tstime_date_singular setting
 while ($values = fgetcsv($handle)) {
   $i++;
   if ($i == 1) {
@@ -41,9 +46,28 @@ while ($values = fgetcsv($handle)) {
     //echo print_r($values, 1) . "\n";
     //dpm($values, 'values');
     dh_update_timeseries_weather($weather);
+    // just save one entry for each date
+    if (!isset($summaries[$sensor])) {
+      $summaries[$sensor] = array();
+    }
+    $summaries[$sensor][date('Y-m-d', dh_handletimestamp($weather['tstime']))] = date('Y-m-d', dh_handletimestamp($weather['tstime']));
   }  
   if ( ($i/500) == intval($i/500)) {
     echo "... $i ";
+  }
+}
+//$sumvar = array_shift($varids = dh_varkey2varid('weather_obs_daily_sum'));
+$sumvar = array_shift(dh_varkey2varid('weather_obs_daily_sum'));
+foreach ($summaries as $sensor => $dates) {
+  foreach ($dates as $thisdate) {
+    $values = array(
+      'featureid' => $sensor,
+      'entity_type' => 'dh_feature',
+      'tstime' => $thisdate,
+      'varid' => $sumvar
+    );
+    echo "Updating $sensor - $thisdate for varid = $sumvar \n";
+    dh_update_timeseries_weather($values, 'tstime_date_singular');
   }
 }
 echo " - total $i records ";
