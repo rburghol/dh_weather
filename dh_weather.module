@@ -22,11 +22,11 @@ function dh_weather_entity_info() {
     ),
     'property info' => array('entity_type', 'featureid', 'tstime', 'tsendtime', 'varid', 'temp', 'wet_time', 'rain', 'rh', 'solar_rad', 'wind_dir', 'wind_spd', 'pres', 'dew_pt', 'tmin', 'tmax'),
     'access callback' => 'dh_feature_access',
-    'module' => 'dh',
+    'module' => 'dh_weather',
     // Enable the entity API's admin UI.
     'admin ui' => array(
       'path' => 'admin/content/dh_timeseries_weather',
-      'file' => 'dh.weather.admin.inc',
+      'file' => 'dh_weather.admin.inc',
       'controller class' => 'dHTimeSeriesWeatherTableUIController',
     ),
   );
@@ -190,6 +190,87 @@ function dh_weather_views_data_alter(&$data) {
   
 }
 
+function dh_weather_noaa_grid_geometry(){
+  // creates a special geometry polygon for use in raster clipping
+  // based on the bundle/ftype weather_sensor/
+  $pieces = dh_get_flow_links($dh_feature->hydroid, $etype = 'dh_feature');
+  $pt_list = implode(',',$pieces);
+  $finfo = field_info_field('dh_geofield');
+  $srid = $finfo['settings']['srid'];
+  // find the coverage to store data without
+  $q = "  select hydroid ";
+  $q .= " from dh_feature ";
+  $q .= " where bundle = 'landunit' ";
+  $q .= " and hydrocode = 'vahydro_nws_precip_grid' ";
+  dsm($q);
+  $rez = db_query($q);
+  $cover_props = $rez->fetchAssoc();
+  dpm($cover_props);
+  $cover_props += array('name' => 'VAHydro NOAA Sensor Coverage', 'hydrocode'=>'vahydro_nws_precip_grid', 'bundle'=>'landunit', 'ftype' => 'nws_precip_grid');
+  if (!$cover_props['hydroid']) {
+    $cover_obj = entity_create('dh_feature', $cover_props);
+  } else {
+    $cover_obj = entity_load_single('dh_feature', $cover_props['hydroid']);
+  }
+  // make its box cover all existing weather sensor points
+  $q = "  select ST_AsText(";
+  $q .= "   st_makepolygon(";
+  $q .= "     st_exteriorring(";
+  $q .= "       st_envelope(";
+  $q .= "         st_extent(dh_geofield_geom)";
+  $q .= "       )";
+  $q .= "     )";
+  $q .= "   )";
+  $q .= " ) as conv_geom, ";
+  $q .= " ST_IsValid(";
+  $q .= "   st_makepolygon(";
+  $q .= "     st_exteriorring(";
+  $q .= "       st_envelope(";
+  $q .= "         st_extent(dh_geofield_geom)";
+  $q .= "       )";
+  $q .= "     )";
+  $q .= "   )";
+  $q .= " ) as geom_status ";
+  $q .= " from field_data_dh_geofield ";
+  $q .= " where bundle = 'weather_sensor' ";
+  $q .= " and ftype = 'nws_precip' ";
+  //dsm($q);
+  $rez = db_query($q);
+  $rez_obj = $rez->fetchObject();
+  $wkt = $rez_obj->conv_geom;
+  $valid = $rez_obj->geom_status;
+  dpm($rez_obj,'rez_obj');
+  return;
+  if ($valid) {
+    $efq = new EntityFieldQuery(); 
+    $efq->entityCondition('entity_type', 'dh_feature');
+    $efq->propertyCondition('bundle', 'conveyance');
+    $efq->propertyCondition('hydroid', $pieces, 'IN');
+    $rez = $efq->execute();
+    if (isset($rez['dh_feature'])) {
+      $rez = array_shift($rez['dh_feature']);
+      $entity_id = $rez->hydroid;
+    }
+    $conv = entity_load_single('dh_feature', $entity_id);
+    if (is_object($conv)) {
+      $conv->dh_geofield = array(
+        LANGUAGE_NONE => array(
+          0 => array(
+            'input_format' => GEOFIELD_INPUT_WKT, 
+            'geom' => $wkt,
+          ),
+        )
+      );
+      //dpm($conv,'after setting geom');
+      $conv->save();
+    } else {
+      watchdog('dh', "Problem trying to load dh_feature $entity_id");
+    }
+  } else {
+    watchdog('dh', "Conveyance Query SQL returned invalid or empty geometry: $q ");
+  }
+}
+
 class dHTimeSeriesWeatherTable extends Entity {
 
   public $is_new;
@@ -282,8 +363,65 @@ class dHTimeSeriesWeatherTableController extends EntityAPIControllerExportable {
       'entity_type' => '',
       'varid' => ''
     );
-    $feature_type = parent::create($values);
-    return $feature_type;
+    $entity = parent::create($values);
+    $plugins = dh_variables_getPlugins($entity);
+    if (!is_array($plugins)) {
+      $plugins = array($plugins);
+    }
+    foreach ($plugins as $plug) {
+      if (method_exists($plug, 'create')) {
+        $plug->create($entity);
+      }
+    }
+    return $entity;
+  }
+  public function save($entity, DatabaseTransaction $transaction = NULL) {
+    $plugins = dh_variables_getPlugins($entity);
+    if (!is_array($plugins)) {
+      $plugins = array($plugins);
+    }
+    foreach ($plugins as $plug) {
+      if (method_exists($plug, 'save')) {
+        $plug->save($entity);
+      }
+    }
+    $timecols = array('tstime', 'tsendtime');
+    foreach ($timecols as $thiscol) {
+      if (property_exists($entity, $thiscol)) {
+        $entity->$thiscol = dh_handletimestamp($entity->$thiscol);
+      }
+    }
+    // check to see if varid is text, if so, do an EFQ on varkey field
+    if (!is_numeric($entity->varid)) {
+      $valid = FALSE;
+      $entity->varid = dh_varkey2varid($entity->varid);
+      if (!$entity->varid) {
+        // @todo: throw exception
+        $entity->varid = 0;
+      }
+    }
+    return parent::save($entity, $transaction);
+  }
+  public function invoke($hook, $entity) {
+    parent::invoke($hook, $entity);
+    $plugins = dh_variables_getPlugins($entity);
+    if (!is_array($plugins)) {
+      $plugins = array($plugins);
+    }
+    foreach ($plugins as $plug) {
+      switch ($hook) {
+        case 'insert':
+        if (method_exists($plug, 'insert')) {
+          $plug->insert($entity);
+        }
+        break;
+        case 'update':
+        if (method_exists($plug, 'update')) {
+          $plug->update($entity);
+        }
+        break;
+      }
+    }
   }
 }
 
@@ -304,19 +442,21 @@ function dh_get_timeseries_weather(&$values, $multiplicity) {
   // make sure the variable is in place and translated to varid
   if (isset($values['varid'])) {
     $var = dh_vardef_info($values['varid']);
+    //dpm($var, "result from dh_vardef_info(" . $values['varid'] . ")");
     if (is_object($var)) {
       $values['varid'] = $var->hydroid;
     }
   }
+  //dpm($values, "dh_get_timeseries_weather(values, $multiplicity)");
   $efq = new EntityFieldQuery;
   $efq->entityCondition('entity_type', 'dh_timeseries_weather');
   $efq->propertyCondition('featureid', $values['featureid'], '=');
-  if (!$multiplicity == 'all') {
-    // if 'all' is requete we ignoire varid, otherwise we want a specific var
+  if (!($multiplicity == 'all')) {
+    // if 'all' is request we ignore varid, otherwise we want a specific var
+    //dpm($values['varid'],'adding varid to efq');
     $efq->propertyCondition('varid', $values['varid'], '=');
   }
   $efq->propertyCondition('entity_type', $values['entity_type'], '=');
-  $efq->propertyCondition('featureid', $values['featureid'], '=');
   // singular - one record only for featureid/entity_type/varid - clear all if multiple
   //   ex: a birthdate
   // non_singular - just force an insert regardless of duplication
@@ -338,6 +478,32 @@ function dh_get_timeseries_weather(&$values, $multiplicity) {
       $efq->propertyCondition('tstime', $values['tstime'], '=');
     break;
     
+    case 'tstime_date_singular':
+      // round to a single day start and end regardless of what the timne frames are
+      // this will guarantee that only 1 entry for each day occurs
+      $start = DateTime::createFromFormat('Y-m-d', date('Y-m-d', $values['tstime']));
+      $end = $start;
+      $end->modify('+1 day');
+      //$nextday = date
+      // take it back to the day beginning
+      $stime = dh_handletimestamp(date('Y-m-d', $values['tstime']));
+      $efq->propertyCondition('tstime', $stime, '>=');
+      // some leap days may have 86399 seconds in them, but we will accept that potential error as it will be only
+      // 1 second of data if we ever collect data at 1 seconds resolution
+      $efq->propertyCondition('tstime', $stime + 86400, '<');
+    break;
+    
+    case 'tstime_enddate_singular':
+      // round to a single day start and end regardless of what the timne frames are
+      // this will guarantee that only 1 entry for each day occurs
+      // take it back to the day beginning
+      $etime = dh_handletimestamp(date('Y-m-d', $values['tsendtime']));
+      $efq->propertyCondition('tsendtime', $etime, '>');
+      // some leap days may have 86399 seconds in them, but we will accept that potential error as it will be only
+      // 1 second of data if we ever collect data at 1 seconds resolution
+      $efq->propertyCondition('tsendtime', $etime + 86400, '<=');
+    break;
+    
     case 'tspan_singular':
       $efq->propertyCondition('tstime', $values['tstime'], '=');
       $efq->propertyCondition('tstime', $values['tsendtime'], '=');
@@ -347,6 +513,7 @@ function dh_get_timeseries_weather(&$values, $multiplicity) {
       $efq->propertyCondition('tstime', $values['tstime'], '=');
     break;
   }
+  //dpm($efq,'get weather');
   $result = $efq->execute();
   return $result;
 }
@@ -378,6 +545,7 @@ function dh_update_timeseries_weather($values, $multiplicity = 'tstime_singular'
     }
   } else {
     //dpm($values,"creating ts");
+    //error_log("creating ts" . print_r($values,1));
     $record = entity_create('dh_timeseries_weather', $values);
   }
   if (is_object($record) and method_exists($record, 'save')) {

@@ -290,4 +290,13 @@ function dh_weather_update_7114() {
     }
   }
 }
+
+function dh_weather_update_7115() {
+  // drupal does not have schema support for raster yet so we add here but do not advertise
+  // @todo: expand support in geofield
+  if (!db_field_exists('dh_timeseries_weather', 'rast')) {
+    drupal_set_message(t("Adding raster to dH Timeseries Weather"));
+    db_query("alter table {dh_timeseries_weather} add column rast raster");
+  }
+}
 ?>
