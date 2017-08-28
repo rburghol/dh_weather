@@ -22,10 +22,9 @@ $date = drush_get_option('date');
 $single = drush_get_option('single');
 $overwrite = drush_get_option('overwrite');
 if ($date) {
-  $today = $date;
-  if ($today == 'today') {
+  if ($date == 'today') {
     $today_obj = new DateTime();
-    $today = $today_obj->format('Y-m-d');
+    $date = $today_obj->format('Y-m-d');
   }
   $single = $single ? filter_var($single, FILTER_VALIDATE_BOOLEAN) : FALSE;
   $overwrite = $overwrite ? filter_var($overwrite, FILTER_VALIDATE_BOOLEAN) : FALSE;
@@ -33,7 +32,7 @@ if ($date) {
   echo "Called: drush scr noaa_daily_precip_retrieval.php --date=$date --single=$single --overwrite=$overwrite\n";
   echo "Usage: drush scr noaa_daily_precip_retrieval.php --date=(yyyy-mm-dd or today) [--single=FALSE] [--overwrite=FALSE]\n";
   echo "Example: Retrieve data for all days since last entry up till today, no overwrite.  \n";
-  echo "  php noaa_daily_precip_retrieval.php today \n";
+  echo "  php noaa_daily_precip_retrieval.php --date=today \n";
   echo "Example: Refresh data from Jan 1, 2015  \n";
   echo "  drush scr noaa_daily_precip_retrieval.php --date=2015-01-01 --single=FALSE --overwrite=FALSE \n";
   echo "Example: Refresh & force overwrite data for only Mar 15, 2015 \n";
@@ -41,7 +40,7 @@ if ($date) {
   die;
 }
 
-print("Retrieving Precip for $today single = $single overwrite = $overwrite .\n");
+print("Retrieving Precip for $date single = $single overwrite = $overwrite .\n");
 
 # get precip till today
 // changed 6/28/2017
