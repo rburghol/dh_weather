@@ -21,6 +21,10 @@ $overwrite = FALSE;
 $date = drush_get_option('date');
 $single = drush_get_option('single');
 $overwrite = drush_get_option('overwrite');
+$bundle = 'landunit';
+$hydrocode = 'vahydro_nws_precip_grid';
+$ftype = 'nws_precip_grid';
+
 if ($date) {
   if ($date == 'today') {
     $today_obj = new DateTime();
@@ -45,21 +49,43 @@ print("Retrieving Precip for $date single = $single overwrite = $overwrite .\n")
 # get precip till today
 // changed 6/28/2017
 $basedataurl = "http://water.weather.gov/precip/downloads";
+
 $config = array(
   'date' => $date,
+  'featureid' => dh_search_feature($hydrocode, $bundle, $ftype),
+  'varkey' => 'noaa_precip_raster',
 );
+$dates = array();
 if (!$single) {
+  $thistime = strtotime($date);
+  $last_time = dh_timeseries_weather_most_recent($config, $debug);
+  if (!$last_time) {
+    // if there is no data we have to handle as a single date
+    $dates[] = $date;
+  } else {
+    $next_time = $last_time + 86400;
+    while ($next_time <= $thistime) {
+      $dates[] = date('Y-m-d', $next_time);
+      $next_time += 86400;
+    }
+  }
+} else {
+  $dates[] = $date;
+}
+error_log('Dates: ' . print_r($dates,1));
+
+foreach ($dates as $date) {
+  $config['date'] = $date;
   $config['dataset'] = 'nws_precip_1day_';
   $config['varkey'] = 'noaa_precip_raster';
-  dh_weather_get_noaa_gridded_precip_to_date($config, $overwrite, $single, $debug);
-} else {
-  $config['dataset'] = 'nws_precip_1day_';
-  dh_weather_get_noaa_gridded_precip($config, $overwrite, $single, $debug);
-  $config['dataset'] = 'nws_precip_wytd_';
-  $config['varkey'] = 'precip_obs_wy2date';
-  $config['multiplicity'] = 'wy2date_singular';
-  dh_weather_get_noaa_gridded_precip($config, $overwrite, $single, $debug);
-  dh_weather_grid_summary($config, $overwrite, $single, $debug);
+  $result = dh_weather_get_noaa_gridded_precip($config, $overwrite, $single, $debug);
+  if ($result) {
+    $config['dataset'] = 'nws_precip_wytd_';
+    $config['varkey'] = 'precip_obs_wy2date';
+    $config['multiplicity'] = 'wy2date_singular';
+    dh_weather_get_noaa_gridded_precip($config, $overwrite, $single, $debug);
+    dh_weather_grid_summary($config, $overwrite, $single, $debug);
+  }
 }
 
 ?>

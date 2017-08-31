@@ -2,6 +2,7 @@
 
 # lib_noaa.php
 function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FALSE, $single = FALSE, $debug=FALSE) {
+  global $databases;
   error_log("config" . print_r($config,1));
   $config += array(
    'baseurl' => "http://water.weather.gov/precip/downloads",
@@ -12,6 +13,7 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
    'multiplicity' => 'tstime_singular', // other options = 'wateryear_singular'
    'dataset' => "nws_precip_1day_",
    'varkey' => "noaa_precip_raster",
+   'dbname' => $databases['default']['default']['database'],
    //'entity_id' => entity_load_single(
   );
   list($yr, $mo, $da) = explode('-', $config['date']);
@@ -43,8 +45,8 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
   # export to postgis format
   raster2pgsql "$fil.conus-4326.tif" tmp_precipgrid > tmp_precipgrid.sql
   # add to database
-  echo "drop table tmp_precipgrid;" | psql -h dbase2 drupal.beta 
-  cat tmp_precipgrid.sql | psql -h dbase2 drupal.beta 
+  echo "drop table tmp_precipgrid;" | psql -h dbase2 drupal.beta
+  cat tmp_precipgrid.sql | psql -h dbase2 drupal.beta
   */
   error_log("copy($url, $config[scratchdir])");
   if (!file_exists($file_path)) {
@@ -61,12 +63,12 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
   error_log("raster2pgsql \"$file_path.conus-4326.tif\" tmp_precipgrid > $sql_path ");
   shell_exec("raster2pgsql \"$file_path.conus-4326.tif\" tmp_precipgrid > $sql_path ");
   $q = "drop table tmp_precipgrid";
-  error_log("echo \"drop table tmp_precipgrid\" | psql -h dbase2 drupal.beta ");
-  shell_exec("echo \"drop table tmp_precipgrid\" | psql -h dbase2 drupal.beta ");
-  error_log("cat $sql_path | psql -h dbase2 drupal.beta ");
-  shell_exec("cat $sql_path | psql -h dbase2 drupal.beta ");
-  error_log("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 drupal.beta ");
-  shell_exec("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 drupal.beta ");
+  error_log("echo \"drop table tmp_precipgrid\" | psql -h dbase2 $config[dbname] ");
+  shell_exec("echo \"drop table tmp_precipgrid\" | psql -h dbase2 $config[dbname] ");
+  error_log("cat $sql_path | psql -h dbase2 $config[dbname] ");
+  shell_exec("cat $sql_path | psql -h dbase2 $config[dbname] ");
+  error_log("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] ");
+  shell_exec("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] ");
   
   // process the file and import into a temp table
   $ts = dh_handletimestamp($config['date']);
@@ -140,6 +142,7 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
   $q .=" and a.ftype = 'nws_precip_grid' ";
   error_log($q);
   db_query($q);
+  return TRUE;
 /*
    if ($debug) { print("Downloading $fileURL.<br>"); }
    $imgdata = imagecreatefromgif ( $fileURL );
@@ -150,7 +153,7 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
 }
 
 function dh_weather_grid_summary($config, $overwrite, $single, $debug) {
-
+  // @todo: do not delete previous until we verify that the desired date exists in the temp table
   $ts = dh_handletimestamp($config['date']);
   
   $q = " delete from dh_timeseries_weather ";
@@ -176,7 +179,7 @@ function dh_weather_grid_summary($config, $overwrite, $single, $debug) {
   $q = " insert into dh_timeseries_weather (entity_type, featureid, varid, tstime, tsendtime, rain) ";
   $q .=" select 'dh_feature', foo.hydroid, var.hydroid as varid, $ts, $tsend, ";
   $q .="   CASE ";
-  $q .="     WHEN SUM(nml) > 0 THEN SUM(obs) / sum(nml) ";
+  $q .="     WHEN SUM(nml) > 0 THEN 100.0 * SUM(obs) / sum(nml) ";
   $q .="     ELSE 0";
   $q .="   END as pct_normal ";
   $q .=" from dh_variabledefinition as var left outer join (";
@@ -222,6 +225,57 @@ function dh_weather_grid_summary($config, $overwrite, $single, $debug) {
   db_query($q);
 }
 
+
+function dh_timeseries_weather_most_recent($config, $debug) {
+  // @todo: do not delete previous until we verify that the desired date exists in the temp table
+  $config += array(
+    'varkey' => 'weather_obs',
+    'entity_type' => 'dh_feature',
+    'bundle' => 'weather_sensor',
+    'ftype' => 'nws_precip',
+    'tstime' => mktime(),
+    'tsendtime' => mktime(),
+    'ftype' => 'nws_precip',
+  );
+  $config['varid'] = array_shift(dh_varkey2varid($config['varkey']));
+  $params = array(
+    ':varid' => $config['varid'],
+    ':featureid' => $config['featureid'],
+    ':entity_type' => $config['entity_type'],
+  );
+  $q = " select max(tstime) as last_time from dh_timeseries_weather ";
+  $q .=" where varid = :varid ";
+  $q .="   and entity_type = :entity_type ";
+  $q .="   and featureid = :featureid";
+  foreach (array('tstime_op' => 'tstime', 'tsendtime_op' => 'tsendtime') as $top => $tcol) {
+    if (isset($config[$top])) {
+      $ts = dh_handletimestamp($config[$tcol]);
+      switch ($config[$top]) {
+        case 'lte':
+        case '<=':
+          $op = '<=';
+        break;
+        case 'lt':
+        case '<':
+          $op = '<';
+        break;
+        case 'gt':
+        case '>':
+          $op = '>';
+        break;
+        case 'gte':
+        case '>=':
+        default:
+          $op = '>=';
+        break;
+        $config[$top] = $op;
+      }
+      $q .="   and $tcol $op " . $config[$tcol];
+    }
+  }
+  $last_time = db_query($q,$params)->fetchField();
+  return $last_time;
+}
 
 function dh_weather_get_noaa_vector_precip ($config = array(), $overwrite = FALSE, $debug = FALSE) {
    $shp2pg_cmd = 'shp2pgsql'; // windows, use shp2pgsql.exe
