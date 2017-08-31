@@ -14,6 +14,7 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
    'dataset' => "nws_precip_1day_",
    'varkey' => "noaa_precip_raster",
    'dbname' => $databases['default']['default']['database'],
+   'username' => $databases['default']['default']['username'],
    //'entity_id' => entity_load_single(
   );
   list($yr, $mo, $da) = explode('-', $config['date']);
@@ -63,12 +64,12 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
   error_log("raster2pgsql \"$file_path.conus-4326.tif\" tmp_precipgrid > $sql_path ");
   shell_exec("raster2pgsql \"$file_path.conus-4326.tif\" tmp_precipgrid > $sql_path ");
   $q = "drop table tmp_precipgrid";
-  error_log("echo \"drop table tmp_precipgrid\" | psql -h dbase2 $config[dbname] ");
-  shell_exec("echo \"drop table tmp_precipgrid\" | psql -h dbase2 $config[dbname] ");
-  error_log("cat $sql_path | psql -h dbase2 $config[dbname] ");
-  shell_exec("cat $sql_path | psql -h dbase2 $config[dbname] ");
-  error_log("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] ");
-  shell_exec("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] ");
+  error_log("echo \"drop table tmp_precipgrid\" | psql -h dbase2 $config[dbname] -U $config[username] ");
+  shell_exec("echo \"drop table tmp_precipgrid\" | psql -h dbase2 $config[dbname] -U $config[username] ");
+  error_log("cat $sql_path | psql -h dbase2 $config[dbname] -U $config[username] ");
+  shell_exec("cat $sql_path | psql -h dbase2 $config[dbname] -U $config[username] ");
+  error_log("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] -U $config[username] ");
+  shell_exec("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] -U $config[username] ");
   
   // process the file and import into a temp table
   $ts = dh_handletimestamp($config['date']);
