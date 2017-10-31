@@ -218,15 +218,97 @@ function dh_weather_grid_summary($config, $overwrite, $single, $debug) {
   $q .="     and c.entity_type = 'dh_feature'";
   $q .="     and a.ftype = 'nws_precip' ";
   $q .="     and varid in (select hydroid from dh_variabledefinition where varkey = 'precip_obs_wy2date' ) ";
+  $q .="     and c.tstime = $ts and c.tsendtime = $tsend ";
   $q .=" ) as foo ";
   $q .=" on (1 = 1) ";
   $q .=" where var.varkey = 'precip_pct_wy2date' ";
   $q .=" group by var.hydroid, foo.hydroid ";
+  error_log("Rolling Current Water-Year Summary for $wy_begin-10-01 ($ts) to $config[date] ($tsend)");
+  error_log($q);
+  db_query($q);
+  
+  # Now do the rolling water year
+  # we always just decrement the beginning water year by 1 since it's rolling.
+  $wy1_begin = $wy_begin - 1;
+  $wy1_end = $wy1_begin + 1;
+  $wy1_ts = dh_handletimestamp("$wy1_begin-10-01");
+  $wy1_ets = dh_handletimestamp("$wy1_end-09-30");
+  
+  dh_weather_clear_vahydro_summary($wy1_ts, $tsend, 'precip_pct_2wy2date');
+  
+  $q = " insert into dh_timeseries_weather (entity_type, featureid, varid, tstime, tsendtime, rain) ";
+  $q .=" select 'dh_feature', foo.hydroid, var.hydroid as varid, $wy1_ts, $tsend, ";
+  $q .="   CASE ";
+  $q .="     WHEN SUM(nml) > 0 THEN 100.0 * SUM(obs) / sum(nml) ";
+  $q .="     ELSE 0";
+  $q .="   END as pct_normal ";
+  $q .=" from dh_variabledefinition as var left outer join (";
+  $q .="   select a.hydrocode, to_timestamp(tstime), a.hydroid, st_astext(b.dh_geofield_geom),";
+  $q .="      CASE";
+  $q .="        WHEN ST_Value(rast, 1, b.dh_geofield_geom) is null THEN 0";
+  $q .="        ELSE ST_Value(rast, 1, b.dh_geofield_geom)";
+  $q .="      END as obs,";
+  $q .="      CASE";
+  $q .="        WHEN ST_Value(rast, 2, b.dh_geofield_geom) is null THEN 0";
+  $q .="        ELSE ST_Value(rast, 2, b.dh_geofield_geom)";
+  $q .="      END as nml, ";
+  $q .="      CASE";
+  $q .="        WHEN ST_Value(rast, 4, b.dh_geofield_geom) is null THEN 0 ";
+  $q .="        ELSE ST_Value(rast, 4, b.dh_geofield_geom) ";
+  $q .="      END as pct";
+  $q .="   from dh_feature as a ";
+  $q .="   left outer join field_data_dh_geofield as b ";
+  $q .="   on (";
+  $q .=" entity_id = a.hydroid ";
+  $q .="     and b.entity_type = 'dh_feature' ";
+  $q .="   )";
+  $q .="   left outer join dh_timeseries_weather as c ";
+  $q .="   on (";
+  $q .="     c.varid in (select hydroid from dh_variabledefinition where varkey = 'precip_pct_2wy2date' ) ";
+  $q .="   )";
+  $q .="   where a.bundle = 'weather_sensor' ";
+  $q .="     and c.featureid in (";
+  $q .="       select hydroid ";
+  $q .="       from dh_feature ";
+  $q .="       where hydrocode = 'vahydro_nws_precip_grid' ";
+  $q .="         and bundle = 'landunit' ";
+  $q .="         and ftype = 'nws_precip_grid'";
+  $q .="     )";
+  $q .="     and c.entity_type = 'dh_feature'";
+  $q .="     and a.ftype = 'nws_precip' ";
+  $q .="     and varid in (select hydroid from dh_variabledefinition where varkey = 'precip_pct_2wy2date' ) ";
+  $q .="     and ( ";
+  $q .="        (c.tstime = $wy1_ts and c.tsendtime =  $wy1_ets) ";
+  $q .="        OR ";
+  $q .="        (c.tstime =  $ts and c.tsendtime = $tsend) ";
+  $q .="      ) ";
+  $q .=" ) as foo ";
+  $q .=" on (1 = 1) ";
+  $q .=" where var.varkey = 'precip_pct_2wy2date' ";
+  $q .=" group by var.hydroid, foo.hydroid ";
+  error_log("Rolling 2-Water-Year Summary for $wy1_begin-10-01 to $wy1_end-10-01 and $wy_begin-10-01 to $config[date]");
+  error_log($q);
+  db_query($q);
+  
+}
+
+function dh_weather_clear_vahydro_summary($ts, $tsend, $varkey) {
+  $q = " delete from dh_timeseries_weather ";
+  $q .=" where varid in (select hydroid from dh_variabledefinition where varkey = '$varkey' ) ";
+  $q .="   and entity_type = 'dh_feature' ";
+  $q .="   and featureid in ( ";
+  $q .="     select hydroid ";
+  $q .="     from dh_feature ";
+  $q .="     where bundle = 'weather_sensor' ";
+  $q .="       and ftype = 'nws_precip' ";
+  $q .="    )";
+  $q .="   and tstime = $ts ";
+  $q .="   and tsendtime = $tsend ";
+  $q .="  ";
   error_log($q);
   db_query($q);
 }
-
-
+  
 function dh_timeseries_weather_most_recent($config, $debug) {
   // @todo: do not delete previous until we verify that the desired date exists in the temp table
   $config += array(
@@ -238,6 +320,8 @@ function dh_timeseries_weather_most_recent($config, $debug) {
     'tsendtime' => mktime(),
     'ftype' => 'nws_precip',
   );
+  $vars = dh_varkey2varid($config['varkey']);
+  error_log("Vars for $config[varkey]:" . print_r($vars,1));
   $config['varid'] = array_shift(dh_varkey2varid($config['varkey']));
   $params = array(
     ':varid' => $config['varid'],
@@ -274,6 +358,7 @@ function dh_timeseries_weather_most_recent($config, $debug) {
       $q .="   and $tcol $op " . $config[$tcol];
     }
   }
+  error_log("Query:" . $q . " params: " . print_r($params,1));
   $last_time = db_query($q,$params)->fetchField();
   return $last_time;
 }
