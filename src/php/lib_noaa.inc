@@ -72,28 +72,32 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
   shell_exec("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] -U $config[username] ");
   
   // process the file and import into a temp table
-  $ts = dh_handletimestamp($config['date']);
-  
+  $date_ts = dh_handletimestamp($config['date']); // timestamp of sdate param
+  // now, delete only the record for the raster, as we will not store the individual points
   $q = " delete from dh_timeseries_weather ";
   $q .=" where varid in (select hydroid from dh_variabledefinition where varkey = '$varkey' ) ";
   $q .="   and entity_type = 'dh_feature' ";
   $q .="   and featureid in ( ";
   $q .="     select hydroid ";
   $q .="     from dh_feature ";
-  $q .="     where bundle = 'weather_sensor' ";
-  $q .="       and ftype = 'nws_precip' ";
+  $q .="     where bundle = 'landunit' ";
+  $q .="       and ftype = 'nws_precip_grid' ";
+  $q .="       and hydrocode = 'vahydro_nws_precip_grid' ";
   $q .="    )";
   switch ($config['multiplicity']) {
     case 'tstime_singular':
       // just overwrite the date if requested
+      $tsend = $date_ts + 86400; // NOAA data is dated by the midnite, but is actually cumulative thru like 9 PM
+      $ts = $date_ts; // 
       $q .="   and tstime = $ts ";
+      $q .="   and tsendtime = $tsend ";
     break;
     case 'wy2date_singular':
       // just overwrite the date if requested
       list($yr, $mo, $da) = explode('-', $config['date']);
       $wy_begin = ($mo < 10) ? $yr - 1: $yr;
       $wy_ts = dh_handletimestamp("$wy_begin-10-01");
-      $tsend = $ts;
+      $tsend = $date_ts;
       $ts = $wy_ts;
       $q .="   and tstime = $ts ";
       $q .="   and tsendtime = $tsend ";
