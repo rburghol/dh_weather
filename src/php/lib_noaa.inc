@@ -134,6 +134,7 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
     $q .="   and xst.tsendtime = $tsend ";
   }
   $q .="   and xst.featureid = a.hydroid ";
+  $q .="   and xst.varid = c.hydroid ";
   $q .=" ) ";
   $q .=" where b.entity_id is not null ";
   $q .=" and c.hydroid is not null ";
