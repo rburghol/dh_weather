@@ -264,7 +264,7 @@ function dh_weather_grid_summary($config, $overwrite, $single, $debug) {
   $q .="   )";
   $q .="   left outer join dh_timeseries_weather as c ";
   $q .="   on (";
-  $q .="     c.varid in (select hydroid from dh_variabledefinition where varkey = 'precip_pct_2wy2date' ) ";
+  $q .="     c.varid in (select hydroid from dh_variabledefinition where varkey = 'precip_obs_wy2date' ) ";
   $q .="   )";
   $q .="   where a.bundle = 'weather_sensor' ";
   $q .="     and c.featureid in (";
@@ -276,15 +276,16 @@ function dh_weather_grid_summary($config, $overwrite, $single, $debug) {
   $q .="     )";
   $q .="     and c.entity_type = 'dh_feature'";
   $q .="     and a.ftype = 'nws_precip' ";
-  $q .="     and varid in (select hydroid from dh_variabledefinition where varkey = 'precip_pct_2wy2date' ) ";
+  $q .="     and varid in (select hydroid from dh_variabledefinition where varkey = 'precip_obs_wy2date' ) ";
   $q .="     and ( ";
-  $q .="        (c.tstime = $wy1_ts and c.tsendtime =  $wy1_ets) ";
+  $q .="        (c.tstime = $wy1_ts and c.tsendtime = $wy1_ets) ";
   $q .="        OR ";
   $q .="        (c.tstime =  $ts and c.tsendtime = $tsend) ";
   $q .="      ) ";
   $q .=" ) as foo ";
   $q .=" on (1 = 1) ";
   $q .=" where var.varkey = 'precip_pct_2wy2date' ";
+  $q .=" and foo.hydroid is not null ";
   $q .=" group by var.hydroid, foo.hydroid ";
   error_log("Rolling 2-Water-Year Summary for $wy1_begin-10-01 to $wy1_end-10-01 and $wy_begin-10-01 to $config[date]");
   error_log($q);
