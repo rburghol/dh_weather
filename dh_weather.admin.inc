@@ -175,6 +175,16 @@ function dh_timeseries_weather_form($form, &$form_state, $dh_timeseries_weather,
     '#size' => 64,
   );*/
 
+  
+  $form['varid'] = array(
+    '#title' => t('Variable ID'),
+    '#type' => 'select',
+    '#options' => dh_vardef_varselect_options(),
+    '#default_value' => $dh_timeseries_weather->varid,
+    '#description' => t('Unique numerical identifier of a variable within the geodatabase. Variables are defined in the VariableDefinition table.'),
+    '#required' => TRUE,
+    //'#size' => 64,
+  );
   $date_format = 'Y-m-d H:i:s';
   $form['tstime'] = array(
     '#title' => t('Event Date/Time'),
@@ -331,16 +341,7 @@ function dh_timeseries_weather_form($form, &$form_state, $dh_timeseries_weather,
     '#description' => t('Unique numerical identifier of a feature within the geodatabase. Usually, the FeatureID of a TimeSeries record is equal to the HydroID of a feature (e.g., well, monitoring point).'),
     '#required' => TRUE,
     '#size' => 64,
-  );   
-  
-  $form['varid'] = array(
-    '#title' => t('Variable ID'),
-    '#type' => 'textfield',
-    '#default_value' => $dh_timeseries_weather->varid,
-    '#description' => t('Unique numerical identifier of a variable within the geodatabase. Variables are defined in the VariableDefinition table.'),
-    '#required' => TRUE,
-    '#size' => 255,
-  );   
+  );
     
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(

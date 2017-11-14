@@ -95,6 +95,23 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     parent::formRowSave($rowvalues, $row);
   }
   
+  public function darkVarinfo(&$entity){
+    $starthour = 21; // 9 pm, could later calculate this algorithmically based on julian day
+    $endhour = 5; // a summertime default
+    list($yesteryear, $yestermonth, $yesterday) = explode ('-', date('Y-m-d', (dh_handletimestamp($entity->tstime) - 86400)));
+    $begin = implode('-', array($yesteryear, $yestermonth, $yesterday)) . " $starthour:00:00";
+    $end = date('Y-m-d', dh_handletimestamp($entity->tstime)) . " $endhour:00:00";
+    $varids = dh_varkey2varid($this->darkness_varkey);
+    $darkinfo = array(
+      'featureid' => $entity->featureid,
+      'tstime' => dh_handletimestamp($begin),
+      'tsendtime' => dh_handletimestamp($end),
+      'entity_type' => $entity->entity_type,
+      'varid' => array_shift( $varids),
+    );
+    return $darkinfo;
+  }
+  
   public function summarizeDarknessTimePeriod($entity) {
     // $entity is the dh_timeseries_weather entity in question
     $starthour = 21; // 9 pm, could later calculate this algorithmically based on julian day
@@ -126,9 +143,10 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
 
   public function save(&$entity){
     // save a summary of the whole day
-    // we need to do a check here in the event that 
-    // we are forcing an override of the daily summary
-    // perhaps we could set a switch on the form handler to add a property to the object?
+    // @todo: we need to do a check here in the event that 
+    //   we are forcing an override of the daily summary
+    //   perhaps we could set a switch on the form handler to add a property to the object?
+    //   For now it forces over-write any time a save is done regardless of data submitted
     $summary = $this->summarizeDaily($entity);
     //dpm($summary,'summary at save()');
     // apply summary values to entity properties and they will get saved by the controller
@@ -146,6 +164,118 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     //dpm($summary,'summary at save()');
     if (is_array($summary)) {
       dh_update_timeseries_weather($summary, 'tstime_enddate_singular');
+      $local_summary = array(
+        'entity_type' => 'dh_timeseries_weather', 
+        'featureid' => $entity->tid, 
+        'bundle' =>'dh_properties',
+        'propvalue' => $entity->wet_time / 60.0,
+        'propname' => 'wet_hrs',
+      ) + $summary;
+      dpm($local_summary,'local sum');
+      dh_update_properties($local_summary, 'name');
+      $local_summary = array(
+        'entity_type' => 'dh_timeseries_weather', 
+        'featureid' => $entity->tid, 
+        'bundle' =>'dh_properties',
+        'propvalue' => 32.0 + $entity->temp * 9.0 / 5.0,
+        'propname' => 'temp_f',
+      ) + $summary;
+      dpm($local_summary,'local sum');
+      dh_update_properties($local_summary, 'name');
+    }
+  }
+  
+  public function buildContent(&$content, &$entity, $view_mode) {
+    // @todo: handle teaser mode and full mode with plugin support
+    //        this won't happen till we enable at module level however, now it only 
+    //        is shown when selecting "plugin" in the view mode in views
+    $content['#view_mode'] = $view_mode;
+    // hide all to begin then allow individual mode to control visibility
+    $hidden = array('varname', 'tstime', 'tid', 'tsvalue', 'tscode', 'entity_type', 'featureid', 'tsendtime', 'modified', 'label', 'rain', 'rh', 'tmin', 'tmax', 'wet_time');
+    foreach ($hidden as $col) {
+      $content[$col]['#type'] = 'hidden';
+    }
+    
+    //$summary = $this->summarizeDarknessTimePeriod($entity);
+    //dpm($summary,'summary realtime');
+    $sumrecs = dh_get_timeseries_weather($this->darkVarinfo($entity));
+    if (isset($sumrecs['dh_timeseries_weather'])) {
+      //dpm($result,"found records - checking singularity settings");
+      $data = entity_load('dh_timeseries_weather', array_keys($summary['dh_timeseries_weather']));
+      $summary = array_shift($data);
+    }
+    //dpm($summary,'summary saved');
+    // @todo: fix this up 
+    $uri = "ipm-live-events/$vineyard/sprayquan/$feature->adminid";
+    $link = array(
+      '#type' => 'link',
+      '#prefix' => '&nbsp;',
+      '#suffix' => '<br>',
+      '#title' => 'Go to ' . $uri,
+      '#href' => $uri,
+      'query' => array(
+        'finaldest' => 'ipm-home/all/all/',
+      ),
+    );
+    switch ($view_mode) {
+      case 'teaser':
+      case 'summary':
+      // summary is like teaser except that Drupal adds label as title to teaser regardless
+        $content['last_updated'] = array(
+          '#type' => 'item',
+          '#markup' => date('Y-m-d h:m', $entity->tsendtime),
+        );
+        $header = array('Temp (lo / hi / dark)',	'RH',	'Wet hrs. (all/dark)');
+        $rows = array(
+          0=>array(
+              round($entity->temp, 1) . '°F (' 
+              . round($entity->tmax, 1) . ' / '
+              . round($entity->tmin, 1) . ' / '
+              . round( $summary->temp, 1) . ')'
+            ,
+            round($entity->rh,1) . ' %',
+            round($entity->wet_time/60,1) . " / " . round($summary->wet_time/60.0,1)),
+        );
+        $content['table'] = array(
+          '#theme' => 'table',
+          '#header' => $header,
+          '#rows' => $rows,
+          '#attributes' => array (
+            'class' => array('views-table', 'cols-3', 'table', 'table-hover', 'table-striped'),
+          ),
+        );
+        $content['link'] = $link; 
+        $content['modified']['#markup'] = '(modified on ' . date('Y-m-d', $entity->tstime) . ")"; 
+      break;
+      
+      // @todo: develop weather summary suitable for iCal???
+      case 'ical_summary':
+        unset($content['title']['#type']);
+        #$content['body']['#type']= 'item'; 
+        $content['body']['#markup'] = $title; 
+        $content = array();
+      break;
+      
+      case 'full':
+      case 'plugin':
+      default:
+      // @todo: what should the full view look like??
+        $content['title'] = array(
+          '#type' => 'item',
+          '#markup' => $title,
+        );         
+        $content['blocks'] = array(
+          '#type' => 'item',
+          '#markup' => '<b>Blocks:</b> ' .implode(', ', $block_names),
+        );         
+        $content['materials'] = array(
+          '#type' => 'item',
+          '#markup' => '<b>Materials:</b> ' .implode(', ', $chem_names),
+        );
+        $content['link'] = $link; 
+        $entity->title = $title;
+        $content['modified']['#markup'] = '(modified on ' . date('Y-m-d', $feature->modified) . ")"; 
+      break;
     }
   }
 

@@ -29,6 +29,24 @@ function dh_weather_entity_info() {
       'file' => 'dh_weather.admin.inc',
       'controller class' => 'dHTimeSeriesWeatherTableUIController',
     ),
+    'view modes' => array(
+      'teaser' => array(
+        'label' => t('Teaser'),
+        'custom settings' =>  FALSE,
+      ),
+      'summary' => array(
+        'label' => t('Summary'),
+        'custom settings' =>  FALSE,
+      ),
+      'full' => array(
+        'label' => t('Full Weather TimeSeries'),
+        'custom settings' =>  FALSE,
+      ),
+      'ical_summary' => array(
+        'label' => t('iCal Summary Field'),
+        'custom settings' =>  FALSE,
+      ),
+    ),
   );
   
   return $return;
@@ -332,6 +350,21 @@ class dHTimeSeriesWeatherTable extends Entity {
   protected function defaultLabel() {
     return $this->varid;
   }
+  
+  protected function setUp() {
+    parent::setUp();
+    if (!empty($this->varid)) {
+      // get the varkey for this
+      $var = dh_vardef_info(intval($this->varid));
+      if (is_object($var)) {
+        $this->varkey = $var->varkey;
+        $this->varname = $var->varname;
+        $this->varcode = $var->varcode;
+        $this->vardesc = $var->vardesc;
+        $this->varunits = $var->varunits;
+      }
+    }
+  }
 }
 
 
@@ -422,6 +455,156 @@ class dHTimeSeriesWeatherTableController extends EntityAPIControllerExportable {
         break;
       }
     }
+  }
+  
+  public function buildContent($entity, $view_mode = 'full', $langcode = NULL, $content = array()) {
+    $content = parent::buildContent($entity, $view_mode, $langcode, $content);
+    // set up basic view modes
+    // then handle all plugins to override defaults 
+    switch ($view_mode) {
+      case 'teaser':
+      case 'summary':
+        $content['varname'] = array(
+          '#type' => 'item',
+          '#title' => t('Type'),
+          '#markup' => $entity->varname,
+        );
+        $content['tstime'] = array(
+          '#type' => 'item',
+          '#title' => t('Start Time'),
+          '#markup' => format_date($entity->tstime),
+        );
+        $content['tsendtime'] = array(
+          '#type' => 'item',
+          '#title' => t('End Time'),
+          '#markup' => format_date($entity->tstime),
+        );
+        $content['rain'] = array(
+          '#type' => 'item',
+          '#title' => t('Rain'),
+          '#markup' => $entity->rain,
+        );
+        $content['rh'] = array(
+          '#type' => 'item',
+          '#title' => t('RH'),
+          '#markup' => $entity->rh,
+        );
+        $content['tmin'] = array(
+          '#type' => 'item',
+          '#title' => t('Tmin'),
+          '#markup' => $entity->tmin,
+        );
+        $content['tmax'] = array(
+          '#type' => 'item',
+          '#title' => t('Tmax'),
+          '#markup' => $entity->tmax,
+        );
+        $content['wet_time'] = array(
+          '#type' => 'item',
+          '#title' => t('Wet Time'),
+          '#markup' => $entity->wet_time,
+        );
+      break;
+      case 'raw':
+        $content['varname'] = array(
+          '#type' => 'item',
+          '#title' => t('Type'),
+          '#markup' => $entity->varname,
+        );
+        $content['tstime'] = array(
+          '#type' => 'item',
+          '#title' => t('Start Time'),
+          '#markup' => format_date($entity->tstime),
+        );
+        $content['tsendtime'] = array(
+          '#type' => 'item',
+          '#title' => t('End Time'),
+          '#markup' => format_date($entity->tstime),
+        );
+        $content['rain'] = array(
+          '#type' => 'item',
+          '#title' => t('Rain'),
+          '#markup' => $entity->rain,
+        );
+        $content['rh'] = array(
+          '#type' => 'item',
+          '#title' => t('RH'),
+          '#markup' => $entity->rh,
+        );
+        $content['tmin'] = array(
+          '#type' => 'item',
+          '#title' => t('Tmin'),
+          '#markup' => $entity->tmin,
+        );
+        $content['tmax'] = array(
+          '#type' => 'item',
+          '#title' => t('Tmax'),
+          '#markup' => $entity->tmax,
+        );
+        $content['wet_time'] = array(
+          '#type' => 'item',
+          '#title' => t('Wet Time'),
+          '#markup' => $entity->wet_time,
+        );
+      break;
+      case 'full':
+      // @todo: plugin mode should be deprecated since it should apply everywhere unless we call for raw 
+      case 'plugin':
+      default:
+        $content['varname'] = array(
+          '#type' => 'item',
+          '#title' => t('Type'),
+          '#markup' => $entity->varname,
+        );
+        $content['tstime'] = array(
+          '#type' => 'item',
+          '#title' => t('Start Time'),
+          '#markup' => format_date($entity->tstime),
+        );
+        $content['tsendtime'] = array(
+          '#type' => 'item',
+          '#title' => t('End Time'),
+          '#markup' => format_date($entity->tstime),
+        );
+        $content['rain'] = array(
+          '#type' => 'item',
+          '#title' => t('Rain'),
+          '#markup' => $entity->rain,
+        );
+        $content['rh'] = array(
+          '#type' => 'item',
+          '#title' => t('RH'),
+          '#markup' => $entity->rh,
+        );
+        $content['tmin'] = array(
+          '#type' => 'item',
+          '#title' => t('Tmin'),
+          '#markup' => $entity->tmin,
+        );
+        $content['tmax'] = array(
+          '#type' => 'item',
+          '#title' => t('Tmax'),
+          '#markup' => $entity->tmax,
+        );
+        $content['wet_time'] = array(
+          '#type' => 'item',
+          '#title' => t('Wet Time'),
+          '#markup' => $entity->wet_time,
+        );
+      break;
+    }
+    if ($view_mode <> 'raw') {
+      $plugins = dh_variables_getPlugins($entity);
+      if (!is_array($plugins)) {
+        $plugins = array($plugins);
+      }
+      foreach ($plugins as $plug) {
+        if (method_exists($plug, 'buildContent')) {
+          $plug->buildContent($content, $entity, $view_mode);
+        }
+      }
+    }
+    return $content;
   }
 }
 
@@ -530,7 +713,7 @@ function dh_update_timeseries_weather($values, $multiplicity = 'tstime_singular'
   }
   $result = dh_get_timeseries_weather($values, $multiplicity);
   if (isset($result['dh_timeseries_weather'])) {
-    dpm($result,"found records - checking singularity settings");
+    //dpm($result,"found records - checking singularity settings");
     $data = entity_load('dh_timeseries_weather', array_keys($result['dh_timeseries_weather']));
     $record = array_shift($data);
     if (!(strpos($multiplicity, 'singular') === FALSE)) {
