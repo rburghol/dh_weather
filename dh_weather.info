@@ -7,7 +7,7 @@ php = 5.3.0
 dependencies[] = dh
 
 files[] = dh_weather.admin.inc
-;files[] = views/dh_weather.views_default.inc
+files[] = views/dh_weather.views_default.inc
 ;files[] = feeds/dh_weather.feeds_importer.default.inc
 
 version = "7.x-1.01"
