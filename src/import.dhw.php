@@ -80,7 +80,7 @@ foreach ($sensors as $sensor) {
     'tstime' => date('Y-m-d'), // this will be overwritten by the plugin as there is only 1
     'varid' => 'weather_pd_last24hrs'
   );
-  echo "Updating $sensor - $thisdate for varid = weather_pd_last24hrs \n";
-  dh_update_timeseries_weather($values, 'singular');
+  $tid = dh_update_timeseries_weather($values, 'singular');
+  echo "Updated $sensor - $thisdate for varid = weather_pd_last24hrs = tid $tid\n";
 }
 ?>
