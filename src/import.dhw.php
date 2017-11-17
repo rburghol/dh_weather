@@ -27,6 +27,7 @@ $keys = array('tstime', 'records', 'battV_min', 'temp', 'rh', 'LWmV_avg', 'LWMdr
 $i = 0;
 echo "Processed ";
 $summaries = array(); 
+$sensors = array(); // a list of individual sensors handled
 // $summaries = array(
 //   2 => array(
 //     '2017-06-01' => '2017-05-01',
@@ -41,6 +42,7 @@ while ($values = fgetcsv($handle)) {
   //dpm($weather,'weather');
   $sensor = isset($entities[$weather['hydrocode']]) ? $entities[$weather['hydrocode']] : get_weather_sensor($entities, $weather['hydrocode']);
   if ($sensor) {
+    $sensors[$sensor] = $sensor; // add to list for later summary
     $weather['featureid'] = $sensor;
     $weather['entity_type'] = 'dh_feature';
     //echo print_r($values, 1) . "\n";
@@ -71,5 +73,14 @@ foreach ($summaries as $sensor => $dates) {
   }
 }
 echo " - total $i records ";
-
+foreach ($sensors as $sensor) {
+  $values = array(
+    'featureid' => $sensor,
+    'entity_type' => 'dh_feature',
+    'tstime' => date('Y-m-d'), // this will be overwritten by the plugin as there is only 1
+    'varid' => 'weather_pd_last24hrs'
+  );
+  echo "Updating $sensor - $thisdate for varid = weather_pd_last24hrs \n";
+  dh_update_timeseries_weather($values, 'singular');
+}
 ?>

@@ -3,6 +3,9 @@ module_load_include('inc', 'dh', 'plugins/dh.display');
 module_load_include('module', 'dh');
 
 class dHVPWeatherSummary extends dHVariablePluginDefault {
+  var $obs_varkey = 'weather_obs';
+  var $last24_varkey = 'weather_pd_last24hrs';
+  var $darkness_varkey = 'weather_daily_dark_sum';
   
   public function summarizeTimePeriod($entity_type, $featureid, $varkey, $begin, $end) {
     $begin = dh_handletimestamp($begin);
@@ -22,10 +25,43 @@ class dHVPWeatherSummary extends dHVariablePluginDefault {
     $q .= "   and tstime < $end ";
     $q .= "   and varid = $varid ";
     $q .= " group by featureid, entity_type ";
-    //dpm($q,'query');
+    //dpm($q,"query for var = $varkey");
     $result = db_query($q);
     $record = $result->fetchAssoc();
     return $record;
+  }
+  
+  public function darkVarinfo(&$entity){
+    $starthour = 21; // 9 pm, could later calculate this algorithmically based on julian day
+    $endhour = 5; // a summertime default
+    list($yesteryear, $yestermonth, $yesterday) = explode ('-', date('Y-m-d', (dh_handletimestamp($entity->tstime) - 86400)));
+    $begin = implode('-', array($yesteryear, $yestermonth, $yesterday)) . " $starthour:00:00";
+    $end = date('Y-m-d', dh_handletimestamp($entity->tstime)) . " $endhour:00:00";
+    $varids = dh_varkey2varid($this->darkness_varkey);
+    $darkinfo = array(
+      'featureid' => $entity->featureid,
+      'tstime' => dh_handletimestamp($begin),
+      'tsendtime' => dh_handletimestamp($end),
+      'entity_type' => $entity->entity_type,
+      'varid' => array_shift( $varids),
+    );
+    return $darkinfo;
+  }
+  
+  public function summarizeDarknessTimePeriod($entity) {
+    // $entity is the dh_timeseries_weather entity in question
+    $starthour = 21; // 9 pm, could later calculate this algorithmically based on julian day
+    $endhour = 5; // a summertime default
+    list($yesteryear, $yestermonth, $yesterday) = explode ('-', date('Y-m-d', (dh_handletimestamp($entity->tstime) - 86400)));
+    //dpm(array($yesteryear, $yestermonth, $yesterday),'yesterday');
+    $begin = implode('-', array($yesteryear, $yestermonth, $yesterday)) . " $starthour:00:00";
+    $end = date('Y-m-d', dh_handletimestamp($entity->tstime)) . " $endhour:00:00";
+    //dpm('range'," $begin, $end");
+    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->obs_varkey, $begin, $end);
+    $varids = dh_varkey2varid($this->darkness_varkey);
+    //dpm($varids, $this->darkness_varkey);
+    $summary['varid'] = array_shift( $varids);
+    return $summary;
   }
 }
 
@@ -60,14 +96,87 @@ if ($hour >= $starthour) {
 // See below
 
 
+class dHVPLast24Weather extends dHVPWeatherSummary {
+  // Create a Most recent data summary
+  var $obs_varkey = 'weather_obs';
+  var $last24_varkey = 'weather_pd_last24hrs';
+  var $darkness_varkey = 'weather_daily_dark_sum';
+  var $ok_cols = array('tstime', 'tsendtime', 'temp', 'wet_time', 'rh', 'rain', 'wind_spd', 'wind_dir', 'solar_rad', 'pres', 'dew_pt', 'tmin', 'tmax');
+  
+  public function __construct($conf = array()) {
+    parent::__construct($conf);
+    $hidden = array('tid', 'tstime', 'tsendtime', 'featureid', 'entity_type', 'bundle');
+    foreach ($hidden as $hide_this) {
+      $this->property_conf_default[$hide_this]['hidden'] = 1;
+    }
+  }
+  
+  public function formRowEdit(&$rowform, $entity) {
+    // apply custom settings here
+    parent::formRowEdit($rowform, $entity);
+  }
+  
+  public function summarizeLast24Hours($entity) {
+    // $entity is the dh_timeseries_weather entity in question
+    $varids = dh_varkey2varid($this->obs_varkey);
+    //dpm($varids, $this->darkness_varkey);
+    $varid = array_shift( $varids);
+    $end = db_query("select max(tstime) from dh_timeseries_weather where featureid = :fid  and varid = :varid", array(':fid' => $entity->featureid, ':varid' => $varid))->fetchField();
+    $begin = $end - 86400;
+    //dpm('range'," $begin, $end");
+    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->obs_varkey, $begin, $end);
+    $varids = dh_varkey2varid($this->last24_varkey);
+    //dpm($varids, $this->darkness_varkey);
+    $summary['varid'] = array_shift( $varids);
+    return $summary;
+  }
+
+  public function save(&$entity){
+    // Find the last 24 hours in this entities time series
+    $summary = $this->summarizeLast24Hours($entity);
+    if (empty($summary)) {
+      return;
+    }
+    // update this entity (ts weather) to have the last 24 data in it
+    foreach($summary as $key => $val) {
+      if (in_array($key, $this->ok_cols)) {
+        $entity->{$key} = $val;
+      }
+    }
+    // this entity will automatically be saved 
+    // save a summary of nighttime periods
+    $summary = $this->summarizeDarknessTimePeriod($entity);
+    if (is_array($summary)) {
+      $wet = array(
+        'entity_type' => 'dh_timeseries_weather', 
+        'featureid' => $entity->tid, 
+        'bundle' =>'dh_properties',
+        'propvalue' => $entity->wet_time / 60.0,
+        'propname' => 'wet_hrs',
+      ) + $summary;
+      dh_update_properties($wet, 'name');
+      $temp = array(
+        'entity_type' => 'dh_timeseries_weather', 
+        'featureid' => $entity->tid, 
+        'bundle' =>'dh_properties',
+        'propvalue' => 32.0 + $entity->temp * 9.0 / 5.0,
+        'propname' => 'temp_f',
+      ) + $summary;
+      dh_update_properties($temp, 'name');
+    }
+  }
+}
+
+
 class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
   // @todo: enable t() for varkey, for example, this is easy, but need to figure out how to 
   //        handle in views - maybe a setting in the filter or jumplists itself?
   //  default: agchem_apply_fert_ee
   //       fr: agchem_apply_fert_fr 
-  var $realtime_varkey = 'weather_obs';
+  var $obs_varkey = 'weather_obs';
   var $daily_varkey = 'weather_obs_daily_sum';
   var $darkness_varkey = 'weather_daily_dark_sum';
+  var $last24_varkey = 'weather_pd_last24hrs';
   
   public function __construct($conf = array()) {
     parent::__construct($conf);
@@ -95,46 +204,13 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     parent::formRowSave($rowvalues, $row);
   }
   
-  public function darkVarinfo(&$entity){
-    $starthour = 21; // 9 pm, could later calculate this algorithmically based on julian day
-    $endhour = 5; // a summertime default
-    list($yesteryear, $yestermonth, $yesterday) = explode ('-', date('Y-m-d', (dh_handletimestamp($entity->tstime) - 86400)));
-    $begin = implode('-', array($yesteryear, $yestermonth, $yesterday)) . " $starthour:00:00";
-    $end = date('Y-m-d', dh_handletimestamp($entity->tstime)) . " $endhour:00:00";
-    $varids = dh_varkey2varid($this->darkness_varkey);
-    $darkinfo = array(
-      'featureid' => $entity->featureid,
-      'tstime' => dh_handletimestamp($begin),
-      'tsendtime' => dh_handletimestamp($end),
-      'entity_type' => $entity->entity_type,
-      'varid' => array_shift( $varids),
-    );
-    return $darkinfo;
-  }
-  
-  public function summarizeDarknessTimePeriod($entity) {
-    // $entity is the dh_timeseries_weather entity in question
-    $starthour = 21; // 9 pm, could later calculate this algorithmically based on julian day
-    $endhour = 5; // a summertime default
-    list($yesteryear, $yestermonth, $yesterday) = explode ('-', date('Y-m-d', (dh_handletimestamp($entity->tstime) - 86400)));
-    //dpm(array($yesteryear, $yestermonth, $yesterday),'yesterday');
-    $begin = implode('-', array($yesteryear, $yestermonth, $yesterday)) . " $starthour:00:00";
-    $end = date('Y-m-d', dh_handletimestamp($entity->tstime)) . " $endhour:00:00";
-    //dpm('range'," $begin, $end");
-    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->realtime_varkey, $begin, $end);
-    $varids = dh_varkey2varid($this->darkness_varkey);
-    //dpm($varids, $this->darkness_varkey);
-    $summary['varid'] = array_shift( $varids);
-    return $summary;
-  }
-  
   public function summarizeDaily($entity) {
     // $entity is the dh_timeseries_weather entity in question
     $date = date('Y-m-d', dh_handletimestamp($entity->tstime));
     $begin = $date . " 00:00:00";
     $end = $date . " 23:59:59";
     //dpm('range'," $begin, $end");
-    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->realtime_varkey, $begin, $end);
+    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->obs_varkey, $begin, $end);
     $varids = dh_varkey2varid($this->daily_varkey);
     //dpm($varids, $this->daily_varkey);
     $summary['varid'] = array_shift( $varids);
@@ -147,6 +223,13 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     //   we are forcing an override of the daily summary
     //   perhaps we could set a switch on the form handler to add a property to the object?
     //   For now it forces over-write any time a save is done regardless of data submitted
+    
+    // Check to make sure this is not plugged into something other than observed by mistake
+    $varids = dh_varkey2varid($this->obs_varkey);
+    $obs_varid = array_shift( $varids);
+    if ($entity->varid <> $obs_varid) {
+      return;
+    }
     $summary = $this->summarizeDaily($entity);
     //dpm($summary,'summary at save()');
     // apply summary values to entity properties and they will get saved by the controller
@@ -171,7 +254,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
         'propvalue' => $entity->wet_time / 60.0,
         'propname' => 'wet_hrs',
       ) + $summary;
-      dpm($local_summary,'local sum');
+      //dpm($local_summary,'local sum');
       dh_update_properties($local_summary, 'name');
       $local_summary = array(
         'entity_type' => 'dh_timeseries_weather', 
@@ -180,7 +263,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
         'propvalue' => 32.0 + $entity->temp * 9.0 / 5.0,
         'propname' => 'temp_f',
       ) + $summary;
-      dpm($local_summary,'local sum');
+      //dpm($local_summary,'local sum');
       dh_update_properties($local_summary, 'name');
     }
   }
