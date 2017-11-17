@@ -102,7 +102,7 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
     'varid' => $varkey
   );
   // create a record of the summary
-  $tid = dh_update_timeseries_weather($values, 'singular');
+  $tid = dh_update_timeseries_weather($values, 'tspan_singular');
   error_log("Inserted weather record $tid for " . print_r($values,1));
   // insert a clipped copy of the raster into the dh_timeseries_weather table
   $q = " update dh_timeseries_weather ";

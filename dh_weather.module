@@ -689,7 +689,7 @@ function dh_get_timeseries_weather(&$values, $multiplicity) {
     
     case 'tspan_singular':
       $efq->propertyCondition('tstime', $values['tstime'], '=');
-      $efq->propertyCondition('tstime', $values['tsendtime'], '=');
+      $efq->propertyCondition('tsendtime', $values['tsendtime'], '=');
     break;
     
     default:
