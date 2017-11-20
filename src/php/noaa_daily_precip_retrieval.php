@@ -12,10 +12,10 @@ $dateranges = array();
 
 # choose water year boundaries based on the beginning of the current water year, 
 # through the current date (convention is to handle the end date as the begining of the month)
-$today = date('Y-m-d');
-$today_obj = new DateTime($today);
-$today_obj->modify("-1 days");
-$today = $today_obj->format('Y-m-d');
+$yesterday = date('Y-m-d');
+$yesterday_obj = new DateTime($yesterday);
+$yesterday_obj->modify("-1 days");
+$yesterday = $yesterday_obj->format('Y-m-d');
 $single = FALSE;
 $overwrite = FALSE;
 $date = drush_get_option('date');
@@ -27,8 +27,8 @@ $ftype = 'nws_precip_grid';
 
 if ($date) {
   if ($date == 'today') {
-    $today_obj = new DateTime();
-    $date = $today_obj->format('Y-m-d');
+    // we do this because the dataset is not finalized until noon the following day
+    $date = $yesterday;
   }
   $single = $single ? filter_var($single, FILTER_VALIDATE_BOOLEAN) : FALSE;
   $overwrite = $overwrite ? filter_var($overwrite, FILTER_VALIDATE_BOOLEAN) : FALSE;
