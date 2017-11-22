@@ -15,9 +15,13 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
    'varkey' => "noaa_precip_raster",
    'dbname' => $databases['default']['default']['database'],
    'username' => $databases['default']['default']['username'],
+   'extent_hydrocode' => 'vahydro_nws_precip_grid',
+   'extent_ftype' => 'nws_precip_grid',
+   'extent_bundle' => 'landunit',
    //'entity_id' => entity_load_single(
   );
   list($yr, $mo, $da) = explode('-', $config['date']);
+  $extent_hydroid = dh_search_feature($config['extent_hydrocode'], $config['extent_bundle'], $config['extent_ftype']);
   $dataset= $config['dataset'];
   $ext=$config['ext'];
   $fil="$dataset$yr$mo$da$ext";
@@ -59,6 +63,7 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
     echo "Could not download $url ...\n";
     return FALSE;
   }
+  // process the file and import into a temp table
   error_log("gdalwarp $file_path -t_srs EPSG:4326 \"$file_path.conus-4326.tif\"");
   shell_exec("gdalwarp $file_path -t_srs EPSG:4326 \"$file_path.conus-4326.tif\"");
   error_log("raster2pgsql \"$file_path.conus-4326.tif\" tmp_precipgrid > $sql_path ");
@@ -71,27 +76,9 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
   error_log("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] -U $config[username] ");
   shell_exec("echo \"grant all on table tmp_precipgrid to drupal\" | psql -h dbase2 $config[dbname] -U $config[username] ");
   
-  // process the file and import into a temp table
+  // handle the dates
   $date_ts = dh_handletimestamp($config['date']); // timestamp of sdate param
-  // now, delete only the record for the raster, as we will not store the individual points
-  $q = " delete from dh_timeseries_weather ";
-  $q .=" where varid in (select hydroid from dh_variabledefinition where varkey = '$varkey' ) ";
-  $q .="   and entity_type = 'dh_feature' ";
-  $q .="   and featureid in ( ";
-  $q .="     select hydroid ";
-  $q .="     from dh_feature ";
-  $q .="     where bundle = 'landunit' ";
-  $q .="       and ftype = 'nws_precip_grid' ";
-  $q .="       and hydrocode = 'vahydro_nws_precip_grid' ";
-  $q .="    )";
   switch ($config['multiplicity']) {
-    case 'tstime_singular':
-      // just overwrite the date if requested
-      $tsend = $date_ts + 86400; // NOAA data is dated by the midnite, but is actually cumulative thru like 9 PM
-      $ts = $date_ts; // 
-      $q .="   and tstime = $ts ";
-      $q .="   and tsendtime = $tsend ";
-    break;
     case 'wy2date_singular':
       // just overwrite the date if requested
       list($yr, $mo, $da) = explode('-', $config['date']);
@@ -99,25 +86,29 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
       $wy_ts = dh_handletimestamp("$wy_begin-10-01");
       $tsend = $date_ts;
       $ts = $wy_ts;
-      $q .="   and tstime = $ts ";
-      $q .="   and tsendtime = $tsend ";
     break;   
+    case 'tstime_singular':
+    default:
+      // just overwrite the date if requested
+      $tsend = $date_ts + 86400; // NOAA data is dated by the midnite, but is actually cumulative thru like 9 PM
+      $ts = $date_ts; // 
+    break;
   }
-  $q .="  ";
-  error_log($q);
-  
+  $values = array(
+    'featureid' => $extent_hydroid,
+    'entity_type' => 'dh_feature',
+    'tstime' => $ts, 
+    'tsendtime' => $tsend, 
+    'varid' => $varkey
+  );
+  // create a record of the summary
+  $tid = dh_update_timeseries_weather($values, 'tspan_singular');
+  error_log("Inserted weather record $tid for " . print_r($values,1));
   // insert a clipped copy of the raster into the dh_timeseries_weather table
-  $q = "  insert into dh_timeseries_weather (entity_type, featureid, varid, ";
-  $q .="   tstime, ";
-  if (isset($tsend)) {
-    $q .="  tsendtime, ";
-  }
-  $q .="   rast) ";
-  $q .=" select 'dh_feature', a.hydroid, c.hydroid as varid, $ts, ";
-  if (isset($tsend)) {
-    $q .="  $tsend, ";
-  }
-  $q .="   st_clip(noaa.rast, st_envelope(st_setsrid(b.dh_geofield_geom,4326))) ";
+  $q = " update dh_timeseries_weather ";
+  $q .= " set rast = foo.rast ";
+  $q .=" from ( ";
+  $q .=" select st_clip(noaa.rast, st_envelope(st_setsrid(b.dh_geofield_geom,4326))) as rast ";
   $q .=" from dh_feature as a ";
   $q .=" left outer join field_data_dh_geofield as b ";
   $q .=" on ( ";
@@ -130,24 +121,26 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
   $q .=" ) ";
   $q .=" left outer join tmp_precipgrid as noaa ";
   $q .=" on (1 = 1) ";
-  $q .=" left outer join dh_timeseries_weather as xst ";
-  $q .=" on (";
-  $q .="   xst.entity_type = 'dh_feature' ";
-  $q .="   and xst.tstime = $ts ";
-  if (isset($tsend)) {
-    $q .="   and xst.tsendtime = $tsend ";
-  }
-  $q .="   and xst.featureid = a.hydroid ";
-  $q .="   and xst.varid = c.hydroid ";
-  $q .=" ) ";
-  $q .=" where b.entity_id is not null ";
-  $q .=" and c.hydroid is not null ";
-  $q .=" and xst.tid is null ";
-  $q .=" and a.hydrocode = 'vahydro_nws_precip_grid' ";
-  $q .=" and a.bundle = 'landunit' ";
-  $q .=" and a.ftype = 'nws_precip_grid' ";
+  $q .="   where b.entity_id is not null ";
+  $q .="   and c.hydroid is not null ";
+  $q .="   and a.hydroid = $extent_hydroid ";
+  $q .=" ) as foo ";
+  $q .=" where tid = $tid ";
   error_log($q);
   db_query($q);
+  // now verify if this is a good one.  If not, clear it
+  $qa_config = array(
+    'band' => 1, 
+    'stat' => 'min', 
+    'nodata_val' => -1000,
+    'start' => -1000,
+    'end' => -1000,
+    'fid' => -1000,
+    'varid' => -1000,
+  );
+  //  validate the new data set
+  $valid = dh_weather_validate_nws_raster('tmp_precipgrid', 'rast', 2);
+
   return TRUE;
 /*
    if ($debug) { print("Downloading $fileURL.<br>"); }
@@ -156,6 +149,41 @@ function dh_weather_get_noaa_gridded_precip ($config = array(), $overwrite = FAL
    if ($debug) { print("Saving to $filename.<br>"); }
    imagegif ( $imgdata, $config['scratchdir'] . '/' . $filename );
 */
+}
+
+function dh_weather_validate_nws_raster($table, $raster_col, $data_col, $nodata_val) {
+  $q = "select st_summarystats($raster_col) from $table ";
+  $stats = db_query($q)->fetchField();
+  if (!$stats) {
+    return FALSE;
+  }
+  list($count, $sum, $mean, $stddev, $min, $max) = explode(',', $stats);
+  if ($mean == $nodata_val) {
+    return FALSE;
+  }
+  return TRUE;
+}
+
+function dh_weather_validate_dh_raster($config) {
+  $q = "select st_summarystats(rast, :band) from {dh_timeseries_weather} where tstime = :start and tsendtime = :end and featureid = :fid and varid = :varid LIMIT 1";
+  $stats = db_query($q, $config)->fetchField();
+  if (!$stats) {
+    return FALSE;
+  }
+  $keyed_stats = array();
+  list(
+    $keyed_stats['count'], 
+    $keyed_stats['sum'],
+    $keyed_stats['mean'], 
+    $keyed_stats['stddev'],
+    $keyed_stats['min'], 
+    $keyed_stats['max']
+  ) = explode(',', $stats);
+  error_log("Stats: " .print_r($keyed_stats,1));
+  if ($keyed_stats[$config['stat']] == $config['nodata_val']) {
+    return FALSE;
+  }
+  return TRUE;
 }
 
 function dh_weather_grid_summary($config, $overwrite, $single, $debug) {
