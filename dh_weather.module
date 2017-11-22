@@ -413,8 +413,11 @@ class dHTimeSeriesWeatherTableController extends EntityAPIControllerExportable {
     if (!is_array($plugins)) {
       $plugins = array($plugins);
     }
+    //dpm($entity,'saving entity');
+    //dpm($plugins,'plugins');
     foreach ($plugins as $plug) {
       if (method_exists($plug, 'save')) {
+        //dpm($plug, "calling plugin save()");
         $plug->save($entity);
       }
     }
@@ -689,7 +692,7 @@ function dh_get_timeseries_weather(&$values, $multiplicity) {
     
     case 'tspan_singular':
       $efq->propertyCondition('tstime', $values['tstime'], '=');
-      $efq->propertyCondition('tstime', $values['tsendtime'], '=');
+      $efq->propertyCondition('tsendtime', $values['tsendtime'], '=');
     break;
     
     default:

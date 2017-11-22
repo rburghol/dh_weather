@@ -227,9 +227,9 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     // Check to make sure this is not plugged into something other than observed by mistake
     $varids = dh_varkey2varid($this->obs_varkey);
     $obs_varid = array_shift( $varids);
-    if ($entity->varid <> $obs_varid) {
-      return;
-    }
+    //if ($entity->varid <> $obs_varid) {
+    //  return;
+    //}
     $summary = $this->summarizeDaily($entity);
     //dpm($summary,'summary at save()');
     // apply summary values to entity properties and they will get saved by the controller
@@ -244,7 +244,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     }
     // save a summary of nighttime periods
     $summary = $this->summarizeDarknessTimePeriod($entity);
-    //dpm($summary,'summary at save()');
+    //dpm($summary,'dark summary at save()');
     if (is_array($summary)) {
       dh_update_timeseries_weather($summary, 'tstime_enddate_singular');
       $local_summary = array(
