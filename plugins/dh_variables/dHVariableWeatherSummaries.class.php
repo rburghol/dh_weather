@@ -227,6 +227,8 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     // Check to make sure this is not plugged into something other than observed by mistake
     $varids = dh_varkey2varid($this->obs_varkey);
     $obs_varid = array_shift( $varids);
+    // this check is obsolete now that the summary is triggered standalone instead
+    // of at every single 15 minute save
     //if ($entity->varid <> $obs_varid) {
     //  return;
     //}
