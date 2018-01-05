@@ -6,6 +6,9 @@ class dHVPWeatherSummary extends dHVariablePluginDefault {
   var $obs_varkey = 'weather_obs';
   var $last24_varkey = 'weather_pd_last24hrs';
   var $darkness_varkey = 'weather_daily_dark_sum';
+  var $daily_varkey = 'weather_obs_daily_sum';
+  var $weekly_varkey = 'weather_obs_weekly_sum';
+  var $monthly_varkey = 'weather_obs_monthly_sum';
   
   public function summarizeTimePeriod($entity_type, $featureid, $varkey, $begin, $end) {
     $begin = dh_handletimestamp($begin);
@@ -46,6 +49,45 @@ class dHVPWeatherSummary extends dHVariablePluginDefault {
       'varid' => array_shift( $varids),
     );
     return $darkinfo;
+  }
+  
+  public function summarizeDaily($entity) {
+    // $entity is the dh_timeseries_weather entity in question
+    $date = date('Y-m-d', dh_handletimestamp($entity->tstime));
+    $begin = $date . " 00:00:00";
+    $end = $date . " 23:59:59";
+    //dpm('range'," $begin, $end");
+    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->obs_varkey, $begin, $end);
+    $varids = dh_varkey2varid($this->daily_varkey);
+    //dpm($varids, $this->daily_varkey);
+    $summary['varid'] = array_shift( $varids);
+    return $summary;
+  }
+  
+  public function summarizeWeekly($entity) {
+    // $entity is the dh_timeseries_weather entity in question
+    $ts = dh_handletimestamp($entity->tstime);
+    $day = date('w', $ts);
+    $begin = date('Y-m-d', $ts - $day * 86400);
+    $end = date('Y-m-d', $ts + (7-$day) * 86400);
+    //dpm('range'," $begin, $end");
+    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->obs_varkey, $begin, $end);
+    //dpm($varids, $this->daily_varkey);
+    $summary['varid'] = dh_varkey2varid($this->weekly_varkey, TRUE);
+    return $summary;
+  }
+  
+  public function summarizeMonthly($entity) {
+    // $entity is the dh_timeseries_weather entity in question
+    $ts = dh_handletimestamp($entity->tstime);
+    $begin = date('Y-m', $ts) . '-01';
+    $end = date('Y-m', $ts) . '-' . date("t", $ts);
+    //dpm('range'," $begin, $end");
+    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->obs_varkey, $begin, $end);
+    //dpm($varids, $this->daily_varkey);
+    $summary['varid'] = dh_varkey2varid($this->monthly_varkey, TRUE);
+    //dpm($summary, 'summarizeMonthly');
+    return $summary;
   }
   
   public function summarizeDarknessTimePeriod($entity) {
@@ -173,10 +215,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
   //        handle in views - maybe a setting in the filter or jumplists itself?
   //  default: agchem_apply_fert_ee
   //       fr: agchem_apply_fert_fr 
-  var $obs_varkey = 'weather_obs';
-  var $daily_varkey = 'weather_obs_daily_sum';
-  var $darkness_varkey = 'weather_daily_dark_sum';
-  var $last24_varkey = 'weather_pd_last24hrs';
+  // test with: http://www.grapeipm.org/d.dev/admin/content/dh_timeseries_weather/manage/44967169 
   
   public function __construct($conf = array()) {
     parent::__construct($conf);
@@ -203,19 +242,6 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     //dpm($rowvalues,'values');
     parent::formRowSave($rowvalues, $row);
   }
-  
-  public function summarizeDaily($entity) {
-    // $entity is the dh_timeseries_weather entity in question
-    $date = date('Y-m-d', dh_handletimestamp($entity->tstime));
-    $begin = $date . " 00:00:00";
-    $end = $date . " 23:59:59";
-    //dpm('range'," $begin, $end");
-    $summary = $this->summarizeTimePeriod($entity->entity_type, $entity->featureid, $this->obs_varkey, $begin, $end);
-    $varids = dh_varkey2varid($this->daily_varkey);
-    //dpm($varids, $this->daily_varkey);
-    $summary['varid'] = array_shift( $varids);
-    return $summary;
-  }
 
   public function save(&$entity){
     // save a summary of the whole day
@@ -232,6 +258,14 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
     //if ($entity->varid <> $obs_varid) {
     //  return;
     //}
+    $weekly = $this->summarizeWeekly($entity);
+    $tid = dh_update_timeseries_weather($weekly, 'tspan_singular');
+    $weekly['tid'] = $tid;
+    //dpm($weekly,'weekly sum');
+    $monthly = $this->summarizeMonthly($entity);
+    $tid = dh_update_timeseries_weather($monthly, 'tspan_singular');
+    $monthly['tid'] = $tid;
+    //dpm($monthly,'monthly sum');
     $summary = $this->summarizeDaily($entity);
     //dpm($summary,'summary at save()');
     // apply summary values to entity properties and they will get saved by the controller
@@ -363,6 +397,6 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
       break;
     }
   }
-
 }
+
 ?>
