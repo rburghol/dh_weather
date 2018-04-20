@@ -189,22 +189,33 @@ class dHVPLast24Weather extends dHVPWeatherSummary {
     // save a summary of nighttime periods
     $summary = $this->summarizeDarknessTimePeriod($entity);
     if (is_array($summary)) {
-      $wet = array(
+      dh_update_timeseries_weather($summary, 'tstime_enddate_singular');
+      $local_summary = array(
         'entity_type' => 'dh_timeseries_weather', 
         'featureid' => $entity->tid, 
         'bundle' =>'dh_properties',
-        'propvalue' => $entity->wet_time / 60.0,
+        'propvalue' => $summary['wet_time'] / 60.0,
         'propname' => 'wet_hrs',
       ) + $summary;
-      dh_update_properties($wet, 'name');
-      $temp = array(
+      //dpm($local_summary,'local sum');
+      dh_update_properties($local_summary, 'name');
+      $local_summary = array(
         'entity_type' => 'dh_timeseries_weather', 
         'featureid' => $entity->tid, 
         'bundle' =>'dh_properties',
-        'propvalue' => 32.0 + $entity->temp * 9.0 / 5.0,
+        'propvalue' => 32.0 + $summary['temp'] * 9.0 / 5.0,
         'propname' => 'temp_f',
       ) + $summary;
-      dh_update_properties($temp, 'name');
+      //dpm($local_summary,'local sum');
+      dh_update_properties($local_summary, 'name');
+      $local_summary = array(
+        'entity_type' => 'dh_timeseries_weather', 
+        'featureid' => $entity->tid, 
+        'bundle' =>'dh_properties',
+        'propvalue' => $summary['rh'],
+        'propname' => 'rh',
+      ) + $summary;
+      dh_update_properties($local_summary, 'name');
     }
   }
 }
@@ -287,7 +298,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
         'entity_type' => 'dh_timeseries_weather', 
         'featureid' => $entity->tid, 
         'bundle' =>'dh_properties',
-        'propvalue' => $entity->wet_time / 60.0,
+        'propvalue' => $summary['wet_time'] / 60.0,
         'propname' => 'wet_hrs',
       ) + $summary;
       //dpm($local_summary,'local sum');
@@ -296,10 +307,18 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
         'entity_type' => 'dh_timeseries_weather', 
         'featureid' => $entity->tid, 
         'bundle' =>'dh_properties',
-        'propvalue' => 32.0 + $entity->temp * 9.0 / 5.0,
+        'propvalue' => 32.0 + $summary['temp'] * 9.0 / 5.0,
         'propname' => 'temp_f',
       ) + $summary;
       //dpm($local_summary,'local sum');
+      dh_update_properties($local_summary, 'name');
+      $local_summary = array(
+        'entity_type' => 'dh_timeseries_weather', 
+        'featureid' => $entity->tid, 
+        'bundle' =>'dh_properties',
+        'propvalue' => $summary['rh'],
+        'propname' => 'rh',
+      ) + $summary;
       dh_update_properties($local_summary, 'name');
     }
   }
