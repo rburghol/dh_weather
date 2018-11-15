@@ -23,19 +23,17 @@ class dHNOAASummary extends dHVarWithTableFieldBase {
     // This version is based on the Chesapeake Bay Watershed Phase 5.3.2 model land uses
     // this brings in an associative array keyed as $table[$luname] = array( $year => $area )
     $table = array();
-    $table[0] = array('mon', 'abbrev', 'month', 'nml_daily', 'obs_daily', 'nml', 'obs', 'days', 'modays');
-    for ($i = 1; $i <= 12; $i++) {
-      $modate = strtotime("2000/$i/01");
-      $table[$i] = array(
-        'mon' => $i,
-        'abbrev' => date('M', $modate),
-        'month' => date('F', $modate),
-        'nml_daily' => 0.0,
-        'obs_daily' => 0.0,
-        'nml' => 0.0,
-        'obs' => 0.0,
-        'days' => ($i == 2) ? 28.25 : date('t', $modate), // this will have the number of days summarized
-        'modays' => ($i == 2) ? 28.25 : date('t', $modate)
+    $table[0] = array('mon', 'nml_daily', 'obs_daily', 'nml', 'obs', 'days', 'modays');
+    for ($mon = 1; $mon <= 12; $mon++) {
+      $modate = strtotime("2000/$mon/01");
+      $nml = 0.0;
+      $nml_daily = 0.0;
+      $obs = 0.0;
+      $obs_daily = 0.0;
+      $days = ($mon == 2) ? 28.25 : date('t', $modate);
+      $modays = ($mon == 2) ? 28.25 : date('t', $modate);
+      $table[$mon] = array(
+        $mon, $nml_daily, $obs_daily, $nml, $obs, $days, $modays 
       );
     }
     return $table;
@@ -46,21 +44,41 @@ class dHNOAASummary extends dHVarWithTableFieldBase {
 class dHNOAAMonthlySummary extends dHNOAASummary {
   var $srckey = 'noaa_precip_raster';
   
-  public function save(&$entity) {
+  public function setUp(&$entity) {
+  //public function create(&$entity) {
     // set up defaults?
-    dpm($entity,'entity');
     if ($this->default_bundle) {
       $entity->bundle = $this->default_bundle;
     }
-    $this->summarizeTimePeriodByMonth($entity->featureid, $this->srckey, '2017-10-01', '2018-09-30');
+    if ($entity->propcode <> 'manual') {
+      $tbl = $this->summarizeTimePeriodByMonth($entity->featureid, $this->srckey, '2017-10-01', '2018-09-30');
+      $this->setCSVTableField($entity, $tbl);
+    }
+  }
+  
+  public function save(&$entity) {
+    // set up defaults?
+    if ($this->default_bundle) {
+      $entity->bundle = $this->default_bundle;
+    }
+    if ($entity->propcode == 'refresh') {
+      $tbl = $this->summarizeTimePeriodByMonth($entity->featureid, $this->srckey, '2017-10-01', '2018-09-30');
+      dsm('Refreshing monthly period summary from NOAA precip rasters.');
+      $this->setCSVTableField($entity, $tbl);
+    }
   }
 	
   public function formRowEdit(&$rowform, $entity) {
     // call parent class to insure proper bundle and presence of tablefield
     parent::formRowEdit($rowform, $entity);
+    if ($entity->is_new and ($entity->propcode <> 'manual')) {
+      $tbl = $this->summarizeTimePeriodByMonth($entity->featureid, $this->srckey, '2017-10-01', '2018-09-30');
+      $this->setCSVTableField($entity, $tbl);
+    }
     $rowform[$this->matrix_field]['#description'] = t('Monthly Trends');
 	  $opts = array(
-	    'automatic' => 'Automatic (from NOAA db)',
+	    'automatic' => 'Automatic (from NOAA db at create)',
+	    'refresh' => 'Refresh on Save (from NOAA db)',
       'manual' => 'Manual',
     );
     $rowform['startdate']['#title'] = t('Period Beginning');
@@ -115,19 +133,22 @@ class dHNOAAMonthlySummary extends dHNOAASummary {
     $q .= " ) as foo  ";
     $q .= " group by hydroid, name, mo ";
     $q .= " order by hydroid, mo ";
-    dpm($q,"Query");
+    //dpm($q,"Query");
     $result = db_query($q);
     $table = $this->tableDefault(FALSE);
     while ($record = $result->fetchAssoc()) {
-      dpm($record, 'rec');
-      $table[$record['mo']]['mon'] = $record['mon'];
-      $table[$record['mo']]['nml_daily'] = $record['nml_precip_in'];
-      $table[$record['mo']]['obs_daily'] = $record['obs'] / $table[$record['mo']]['modays'];
-      $table[$record['mo']]['nml'] = $record['nml_precip_in'] * $table[$record['mo']]['modays'];
-      $table[$record['mo']]['obs'] = $record['obs'];
-      $table[$record['mo']]['days'] = $record['numdays'];
+      $mon = $record['mo'];
+      $modate = strtotime("2000/$mon/01");
+      $modays = $table[$mon][6];
+      $days = $record['numdays'];
+      $nml_daily = $record['nml_precip_in'];
+      $nml = $modays * $nml_daily;
+      $obs = 0.0;
+      $obs_daily = $record['obs'] / $modays;
+      $table[$mon] = array(
+        $mon, $nml_daily, $obs_daily, $nml, $obs, $days, $modays 
+      );
     }
-    dpm($table,'table');
     return $table;
     
   }
