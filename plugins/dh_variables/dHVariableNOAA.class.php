@@ -44,14 +44,21 @@ class dHNOAASummary extends dHVarWithTableFieldBase {
 class dHNOAAMonthlySummary extends dHNOAASummary {
   var $srckey = 'noaa_precip_raster';
   
-  public function setUp(&$entity) {
-  //public function create(&$entity) {
+  public function create(&$entity) {
     // set up defaults?
     if ($this->default_bundle) {
       $entity->bundle = $this->default_bundle;
     }
     if ($entity->propcode <> 'manual') {
-      $tbl = $this->summarizeTimePeriodByMonth($entity->featureid, $this->srckey, '2017-10-01', '2018-09-30');
+      $tbl = $this->summarizeTimePeriodByMonth($entity, $this->srckey, '2017-10-01', '2018-09-30');
+      $this->setCSVTableField($entity, $tbl);
+    }
+  }
+  
+  public function insert(&$entity) {
+    if ($entity->propcode == 'refresh') {
+      $tbl = $this->summarizeTimePeriodByMonth($entity, $this->srckey, '2017-10-01', '2018-09-30');
+      dsm('Refreshing monthly period summary from NOAA precip rasters.');
       $this->setCSVTableField($entity, $tbl);
     }
   }
@@ -61,8 +68,8 @@ class dHNOAAMonthlySummary extends dHNOAASummary {
     if ($this->default_bundle) {
       $entity->bundle = $this->default_bundle;
     }
-    if ($entity->propcode == 'refresh') {
-      $tbl = $this->summarizeTimePeriodByMonth($entity->featureid, $this->srckey, '2017-10-01', '2018-09-30');
+    if ($entity->propcode <> 'manual') {
+      $tbl = $this->summarizeTimePeriodByMonth($entity, $this->srckey, '2017-10-01', '2018-09-30');
       dsm('Refreshing monthly period summary from NOAA precip rasters.');
       $this->setCSVTableField($entity, $tbl);
     }
@@ -70,9 +77,11 @@ class dHNOAAMonthlySummary extends dHNOAASummary {
 	
   public function formRowEdit(&$rowform, $entity) {
     // call parent class to insure proper bundle and presence of tablefield
+    //dpm($entity,'ent');
     parent::formRowEdit($rowform, $entity);
-    if ($entity->is_new and ($entity->propcode <> 'manual')) {
-      $tbl = $this->summarizeTimePeriodByMonth($entity->featureid, $this->srckey, '2017-10-01', '2018-09-30');
+    if ( ($entity->is_new === TRUE) and ($entity->propcode <> 'manual')) {
+      //dpm($entity->is_new,'ent->is_new');
+      $tbl = $this->summarizeTimePeriodByMonth($entity, $this->srckey, '2017-10-01', '2018-09-30');
       $this->setCSVTableField($entity, $tbl);
     }
     $rowform[$this->matrix_field]['#description'] = t('Monthly Trends');
@@ -87,14 +96,14 @@ class dHNOAAMonthlySummary extends dHNOAASummary {
       '#title' => t('Summary Data Entry Mode'),
       '#type' => 'select',
       '#options' => $opts,
-      '#default_value' => $row->{$this->row_map['code']},
+      '#default_value' => $entity->propcode,
       '#size' => 1,
       '#weight' => -1,
 	    '#description' => 'Select Manual to set custom values for these period averages',
     );
   }
   
-  public function summarizeTimePeriodByMonth($featureid, $varkey, $begin, $end) {
+  public function summarizeTimePeriodByMonth($entity, $varkey, $begin, $end) {
     $varid = implode(',', dh_varkey2varid($varkey));
     $begin = dh_handletimestamp($begin);
     $end = dh_handletimestamp($end);
@@ -118,7 +127,7 @@ class dHNOAAMonthlySummary extends dHNOAASummary {
     $q .= "     on (  ";
     $q .= "       c.varid in (select hydroid from dh_variabledefinition where varkey = '$varkey' )  ";
     $q .= "     ) ";
-    $q .= "     where a.hydroid in ( $featureid) ";
+    $q .= "     where a.hydroid in ( $entity->featureid) ";
     $q .= "     and c.featureid in ( ";
     $q .= "       select hydroid  ";
     $q .= "       from dh_feature  ";
@@ -136,6 +145,7 @@ class dHNOAAMonthlySummary extends dHNOAASummary {
     //dpm($q,"Query");
     $result = db_query($q);
     $table = $this->tableDefault(FALSE);
+    $total = 0.0;
     while ($record = $result->fetchAssoc()) {
       $mon = $record['mo'];
       $modate = strtotime("2000/$mon/01");
@@ -143,14 +153,15 @@ class dHNOAAMonthlySummary extends dHNOAASummary {
       $days = $record['numdays'];
       $nml_daily = $record['nml_precip_in'];
       $nml = $modays * $nml_daily;
+      $total += $nml;
       $obs = 0.0;
       $obs_daily = $record['obs'] / $modays;
       $table[$mon] = array(
         $mon, $nml_daily, $obs_daily, $nml, $obs, $days, $modays 
       );
     }
+    $entity->propvalue = $total;
     return $table;
-    
   }
 }
 
