@@ -1,0 +1,157 @@
+Driver: GRIB/GRIdded Binary (.grb)
+Files: rtma2p5.t10z.2dvarges_ndfd.grb2_wexp
+Size is 2345, 1597
+Coordinate System is:
+PROJCS["unnamed",
+    GEOGCS["Coordinate System imported from GRIB file",
+        DATUM["unknown",
+            SPHEROID["Sphere",6371200,0]],
+        PRIMEM["Greenwich",0],
+        UNIT["degree",0.0174532925199433]],
+    PROJECTION["Lambert_Conformal_Conic_2SP"],
+    PARAMETER["standard_parallel_1",25],
+    PARAMETER["standard_parallel_2",25],
+    PARAMETER["latitude_of_origin",25],
+    PARAMETER["central_meridian",265],
+    PARAMETER["false_easting",0],
+    PARAMETER["false_northing",0]]
+Origin = (-3272417.139794263057411,3790838.336787313688546)
+Pixel Size = (2539.702999999999975,-2539.702999999999975)
+Corner Coordinates:
+Upper Left  (-3272417.140, 3790838.337) (138d23'38.83"W, 53d 3'24.70"N)
+Lower Left  (-3272417.140, -265067.354) (126d17' 7.85"W, 19d12'55.14"N)
+Upper Right ( 2683186.395, 3790838.337) ( 59d 1'17.39"W, 54d22'46.71"N)
+Lower Right ( 2683186.395, -265067.354) ( 69d11'54.86"W, 20d19' 6.16"N)
+Center      ( -294615.372, 1762885.491) ( 98d21'20.63"W, 40d36'59.97"N)
+Band 1 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 0[-] SFC="Ground or water surface"
+  Metadata:
+    GRIB_COMMENT=Geopotential height [gpm]
+    GRIB_ELEMENT=HGT
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_PDS_PDTN=0
+    GRIB_PDS_TEMPLATE_NUMBERS=3 5 2 0 109 0 0 0 1 0 0 0 1 1 0 0 0 0 0 255 0 0 0 0 0
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=0-SFC
+    GRIB_UNIT=[gpm]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 2 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 0[-] SFC="Ground or water surface"
+  Metadata:
+    GRIB_COMMENT=Pressure [Pa]
+    GRIB_ELEMENT=PRES
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=0-SFC
+    GRIB_UNIT=[Pa]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 3 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 2[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=Temperature [K]
+    GRIB_ELEMENT=TMP
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=2-HTGL
+    GRIB_UNIT=[K]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 4 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 2[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=Dew point temperature [K]
+    GRIB_ELEMENT=DPT
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=2-HTGL
+    GRIB_UNIT=[K]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 5 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 10[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=u-component of wind [m/s]
+    GRIB_ELEMENT=UGRD
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=10-HTGL
+    GRIB_UNIT=[m/s]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 6 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 10[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=v-component of wind [m/s]
+    GRIB_ELEMENT=VGRD
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=10-HTGL
+    GRIB_UNIT=[m/s]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 7 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 2[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=Specific humidity [kg/kg]
+    GRIB_ELEMENT=SPFH
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=2-HTGL
+    GRIB_UNIT=[kg/kg]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 8 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 10[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=Wind direction (from which blowing) [deg true]
+    GRIB_ELEMENT=WDIR
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=10-HTGL
+    GRIB_UNIT=[deg true]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 9 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 10[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=Wind speed [m/s]
+    GRIB_ELEMENT=WIND
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=10-HTGL
+    GRIB_UNIT=[m/s]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 10 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 10[m] HTGL="Specified height level above ground"
+  Metadata:
+    GRIB_COMMENT=Wind speed (gust) [m/s]
+    GRIB_ELEMENT=GUST
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=10-HTGL
+    GRIB_UNIT=[m/s]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 11 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 0[-] SFC="Ground or water surface"
+  Metadata:
+    GRIB_COMMENT=Visibility [m]
+    GRIB_ELEMENT=VIS
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=0-SFC
+    GRIB_UNIT=[m]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 12 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 0[-] CEIL="Cloud ceiling"
+  Metadata:
+    GRIB_COMMENT=Ceiling [m]
+    GRIB_ELEMENT=
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=0-CEIL
+    GRIB_UNIT=[m]
+    GRIB_VALID_TIME=  1552384800 sec UTC
+Band 13 Block=2345x1 Type=Float64, ColorInterp=Undefined
+  Description = 0[-] EATM="Entire atmosphere (considerd as a single layer)"
+  Metadata:
+    GRIB_COMMENT=Total cloud cover [%]
+    GRIB_ELEMENT=TCDC
+    GRIB_FORECAST_SECONDS=3600 sec
+    GRIB_REF_TIME=  1552381200 sec UTC
+    GRIB_SHORT_NAME=0-EATM
+    GRIB_UNIT=[%]
+    GRIB_VALID_TIME=  1552384800 sec UTC
