@@ -16,7 +16,7 @@
   $q .= " and tstime <> 0 ";
   $q .= " group by featureid, entity_type, date_trunc('day', to_timestamp(tstime) at time zone 'EST') ";
   $q .= " order by date_trunc('day', to_timestamp(tstime) at time zone 'EST') ";
-  //$q .= " LIMIT 10 ";
+  //$q .= " LIMIT 40 ";
   error_log("$q");
   $result = db_query($q);
   // If we want to do a single one uncomment these lines:
@@ -29,9 +29,9 @@
   while ($record = $result->fetchAssoc()) {
     // get events
     // Load some entity.
-    dh_update_timeseries_weather($record, 'tstime_date_singular');
+    $tid = dh_update_timeseries_weather($record, 'tstime_date_singular');
     //echo "Object" . print_r($form,1) . "\n";
-    echo "saved $record[featureid] " . date('Y-m-d', $record['tstime']) . " \n";
+    echo "saved $record[featureid] ($tid)" . $record['tstime'] . " \n";
   }
 
 ?>

@@ -289,6 +289,7 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
         }
       }
     }
+    //dpm($entity,'entity');
     // save a summary of nighttime periods
     $summary = $this->summarizeDarknessTimePeriod($entity);
     //dpm($summary,'dark summary at save()');
@@ -319,6 +320,8 @@ class dHVPDailyWeatherSummary extends dHVPWeatherSummary {
         'propvalue' => $summary['rh'],
         'propname' => 'rh',
       ) + $summary;
+      //dpm($local_summary,'rh sum');
+      //dpm($summary,'summary');
       dh_update_properties($local_summary, 'name');
     }
   }
