@@ -64,10 +64,12 @@ if (!$single) {
     $dates[] = $date;
   } else {
     $next_time = $last_time + 86400;
+    error_log("Checking next time: $next_time");
     while ($next_time <= $thistime) {
       $dates[] = date('Y-m-d', $next_time);
       $next_time += 86400;
     }
+    error_log("Final time: $next_time");
   }
 } else {
   $dates[] = $date;
