@@ -394,6 +394,7 @@ function dh_timeseries_weather_most_recent($config, $debug) {
   }
   error_log("Query:" . $q . " params: " . print_r($params,1));
   $last_time = db_query($q,$params)->fetchField();
+  error_log("Returned: $last_time");
   return $last_time;
 }
 
