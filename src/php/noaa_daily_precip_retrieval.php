@@ -59,12 +59,13 @@ $dates = array();
 if (!$single) {
   $thistime = strtotime($date);
   $last_time = dh_timeseries_weather_most_recent($config, $debug);
+  error_log("Last data time: $last_time " .date('Y-m-d', $last_time) );
   if (!$last_time) {
     // if there is no data we have to handle as a single date
     $dates[] = $date;
   } else {
     $next_time = $last_time + 86400;
-    error_log("Checking next time: $next_time");
+    error_log("Checking next time: $next_time " .date('Y-m-d', $next_time) );
     while ($next_time <= $thistime) {
       $dates[] = date('Y-m-d', $next_time);
       $next_time += 86400;
