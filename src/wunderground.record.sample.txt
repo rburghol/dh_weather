@@ -1,0 +1,44 @@
+ [stationID] => KVACROZE25
+                    [tz] => America/New_York
+                    [obsTimeUtc] => 2019-06-16T21:39:46Z
+                    [obsTimeLocal] => 2019-06-16 17:39:46
+                    [epoch] => 1560721186
+                    [lat] => 38.06299973
+                    [lon] => -78.73000336
+                    [solarRadiationHigh] => 717.2
+                    [uvHigh] => 2
+                    [winddirAvg] => 169
+                    [humidityHigh] => 65
+                    [humidityLow] => 43
+                    [humidityAvg] => 57
+                    [qcStatus] => 1
+                    [imperial] => stdClass Object
+                        (
+                            [tempHigh] => 90
+                            [tempLow] => 87
+                            [tempAvg] => 88
+                            [windspeedHigh] => 10
+                            [windspeedLow] => 0
+                            [windspeedAvg] => 4
+                            [windgustHigh] => 15
+                            [windgustLow] => 0
+                            [windgustAvg] => 6
+                            [dewptHigh] => 75
+                            [dewptLow] => 64
+                            [dewptAvg] => 71
+                            [windchillHigh] => 90
+                            [windchillLow] => 87
+                            [windchillAvg] => 88
+                            [heatindexHigh] => 98
+                            [heatindexLow] => 91
+                            [heatindexAvg] => 95
+                            [pressureMax] => 29.94
+                            [pressureMin] => 29.91
+                            [pressureTrend] => -0.05
+                            [precipRate] => 0
+                            [precipTotal] => 0
+                        )
+
+                )
+
+        )
