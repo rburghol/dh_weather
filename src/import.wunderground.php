@@ -18,8 +18,11 @@ $vars = array(
  
 $vars['apiKey'] = '9cf8f8f4b17c4d24b8f8f4b17c1d2443';
 $vars['stationId'] = 'KVACROZE25';
- 
-$feed_url = url($furi, array('query' => $vars));
+
+// get 7 day history
+$feed_url = url($uri, array('query' => $vars));
+// get 5 day forecast
+//$feed_url = url($furi, array('query' => $vars));
 echo "Trying ... " . $feed_url . "\n";
 $feed = file_get_contents($feed_url);
 
